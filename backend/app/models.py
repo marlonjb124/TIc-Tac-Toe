@@ -1,48 +1,130 @@
-"""
-User model following SQLModel pattern.
-Centralizes all user-related models and schemas.
-"""
+"""Data models and schemas for the Tic-Tac-Toe API."""
 
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Optional
 
 from pydantic import EmailStr
 from sqlmodel import Field, SQLModel
 
 
-# Shared properties
-class UserBase(SQLModel):
-    """Base user properties shared across schemas."""
+class GameStatus(str, Enum):
+    IN_PROGRESS = "in_progress"
+    FINISHED = "finished"
+    DRAW = "draw"
 
+
+class Player(str, Enum):
+    X = "X"
+    O = "O"  # noqa: E741
+
+
+class OpponentType(str, Enum):
+    AI = "ai"
+    ALGORITHM = "algorithm"
+
+
+class Difficulty(str, Enum):
+    EASY = "EASY"
+    MEDIUM = "MEDIUM"
+    HARD = "HARD"
+
+
+class UserBase(SQLModel):
     email: EmailStr = Field(unique=True, index=True, max_length=255)
     is_active: bool = True
-    is_superuser: bool = False
     full_name: Optional[str] = Field(default=None, max_length=255)
 
 
-# Properties to receive via API on creation
 class UserCreate(UserBase):
-    """Schema for user creation via API."""
-
     password: str = Field(min_length=8, max_length=100)
 
 
-# Properties to receive via API on update
 class UserUpdate(SQLModel):
-    """Schema for user update via API. All fields are optional."""
-
     email: Optional[EmailStr] = None
     full_name: Optional[str] = Field(default=None, max_length=255)
     password: Optional[str] = Field(default=None, min_length=8, max_length=100)
 
 
-# Database model, database table inferred from class name
 class User(UserBase, table=True):
-    """User database model."""
-
     id: Optional[int] = Field(default=None, primary_key=True)
     hashed_password: str
-    # Use timezone-aware datetimes for compatibility with recent versions
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    is_superuser: bool = False
+
+
+class UserPublic(UserBase):
+    id: int
+    created_at: datetime
+    is_superuser: bool = False
+
+
+class UsersPublic(SQLModel):
+    data: list[UserPublic]
+    count: int
+
+
+class Token(SQLModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenPayload(SQLModel):
+    sub: Optional[int] = None
+    exp: Optional[int] = None
+
+
+# ===== Game Models =====
+
+
+# Shared properties for Game
+class GameBase(SQLModel):
+    """Base game properties shared across schemas."""
+
+    opponent_type: OpponentType = Field(
+        default=OpponentType.AI,
+        description=(
+            "Type of opponent: 'ai' (OpenRouter models) or "
+            "'algorithm' (Local algorithm)"
+        ),
+    )
+    difficulty: Difficulty = Field(
+        default=Difficulty.MEDIUM,
+        description="Difficulty level: 'EASY', 'MEDIUM', or 'HARD'",
+    )
+
+
+# Properties to receive via API on game creation
+# it can inherate of gamebase in the future
+class GameCreate(GameBase):
+    """Schema for game creation via API."""
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"opponent_type": "ai", "difficulty": "MEDIUM"},
+                {"opponent_type": "ai", "difficulty": "HARD"},
+                {"opponent_type": "algorithm", "difficulty": "EASY"},
+            ]
+        }
+    }
+
+
+# Database model for Game
+class Game(GameBase, table=True):
+    """Game database model."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    board: str = Field(default=" " * 9, max_length=9)  # 9 positions (0-8)
+    status: GameStatus = Field(default=GameStatus.IN_PROGRESS)
+    current_player: Player = Field(default=Player.X)
+    winner: Optional[Player] = None
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -52,30 +134,62 @@ class User(UserBase, table=True):
 
 
 # Properties to return via API
-class UserPublic(UserBase):
-    """Public user properties returned via API."""
+class GamePublic(GameBase):
+    """Public game properties returned via API."""
 
     id: int
+    user_id: int
+    board: list[str]  # Return as array for frontend
+    status: GameStatus
+    current_player: Player
+    winner: Optional[Player]
     created_at: datetime
+    updated_at: datetime
 
 
-class UsersPublic(SQLModel):
-    """Paginated list of users."""
+class GamesPublic(SQLModel):
+    """Paginated list of games."""
 
-    data: list[UserPublic]
+    data: list[GamePublic]
     count: int
 
 
-# Token models
-class Token(SQLModel):
-    """JWT token response."""
+# Move models
+class MoveCreate(SQLModel):
+    """Schema for creating a move."""
 
-    access_token: str
-    token_type: str = "bearer"
+    position: int = Field(
+        ge=0,
+        le=8,
+        description="Board position (0-8). Layout: 0|1|2 / 3|4|5 / 6|7|8",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{"position": 0}, {"position": 4}, {"position": 8}]
+        }
+    }
 
 
-class TokenPayload(SQLModel):
-    """JWT token payload."""
+class MovePublic(SQLModel):
+    """Public move information."""
 
-    sub: Optional[int] = None  # User ID
-    exp: Optional[int] = None  # Expiration timestamp
+    position: int
+    player: Player
+    board: list[str]
+    status: GameStatus
+    winner: Optional[Player]
+    ai_move: Optional[int] = None  # AI's response move position
+
+
+# Database model for Move (optional, for history tracking)
+class Move(SQLModel, table=True):
+    """Move database model for tracking game history."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    game_id: int = Field(foreign_key="game.id", index=True)
+    position: int = Field(ge=0, le=8)
+    player: Player
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )

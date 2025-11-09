@@ -120,3 +120,60 @@ class BadRequestException(AppException):
             error_code=error_code,
             details=details,
         )
+
+
+# Game-specific exceptions
+
+
+class InvalidMoveException(AppException):
+    """Exception raised when a move is invalid."""
+
+    def __init__(
+        self,
+        message: str = "Invalid move",
+        error_code: str = "INVALID_MOVE",
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Initialize invalid move exception with 400 status code."""
+        super().__init__(
+            message=message,
+            status_code=400,
+            error_code=error_code,
+            details=details,
+        )
+
+
+class GameOverException(AppException):
+    """Exception raised when trying to play on a finished game."""
+
+    def __init__(
+        self,
+        message: str = "Game is already finished",
+        error_code: str = "GAME_OVER",
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Initialize game over exception with 400 status code."""
+        super().__init__(
+            message=message,
+            status_code=400,
+            error_code=error_code,
+            details=details,
+        )
+
+
+class AIServiceException(AppException):
+    """Exception raised when AI service fails."""
+
+    def __init__(
+        self,
+        message: str = "AI service error",
+        error_code: str = "AI_SERVICE_ERROR",
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
+        """Initialize AI service exception with 503 status code."""
+        super().__init__(
+            message=message,
+            status_code=503,
+            error_code=error_code,
+            details=details,
+        )

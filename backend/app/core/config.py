@@ -43,11 +43,12 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = secrets.token_urlsafe(32)
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 600  # 10 hours default
     ALGORITHM: str = "HS256"
 
     # Environment
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
+    DEBUG: bool = True  # Show detailed errors in development
 
     # CORS
     FRONTEND_HOST: str = "http://localhost:5173"
@@ -65,7 +66,7 @@ class Settings(BaseSettings):
 
     # Database - MariaDB/MySQL
     MYSQL_SERVER: str = "localhost"
-    MYSQL_PORT: int = 3306
+    MYSQL_PORT: int = 33060  # Default to external port for local dev
     MYSQL_USER: str = "tictactoe_user"
     MYSQL_PASSWORD: str = ""
     MYSQL_DB: str = "tictactoe"
@@ -83,20 +84,25 @@ class Settings(BaseSettings):
             path=self.MYSQL_DB,
         ).unicode_string()
 
-    # First superuser
     FIRST_SUPERUSER: EmailStr = "admin@tictactoe.com"  # type: ignore
-    FIRST_SUPERUSER_PASSWORD: str = "changethis"
+    FIRST_SUPERUSER_PASSWORD: str = "changethis123"
+
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = "anthropic/claude-3.5-sonnet"
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    AI_MAX_RETRIES: int = 3
+    AI_TIMEOUT_SECONDS: int = 30
 
     @model_validator(mode="after")
     def _check_default_secret(self) -> Self:
         """Check if default secret is being used in production."""
         if self.ENVIRONMENT != "local":
-            if self.SECRET_KEY == "changethis":
+            if self.SECRET_KEY == secrets.token_urlsafe(32):
                 warnings.warn(
                     "Using default SECRET_KEY in non-local environment",
                     stacklevel=1,
                 )
-            if self.FIRST_SUPERUSER_PASSWORD == "changethis":
+            if self.FIRST_SUPERUSER_PASSWORD == "changethis123":
                 warnings.warn(
                     "Using default superuser password in production",
                     stacklevel=1,

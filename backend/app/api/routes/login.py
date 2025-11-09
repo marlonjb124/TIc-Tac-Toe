@@ -12,10 +12,37 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
 from app.core.security import security
-from app.models import Token, UserPublic
+from app.models import Token, UserCreate, UserPublic
 from app.services.user_service import user_service
 
 router = APIRouter()
+
+
+@router.post("/signup", response_model=Token)
+async def signunp(session: SessionDep, user: UserCreate) -> Token:
+    """Sign up and also login a new user and return access token."""
+    existing_user = await user_service.get_by_email(
+        session=session, email=user.email
+    )
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        )
+
+    new_user = await user_service.create(
+        session=session,
+        user_create=user,
+    )
+
+    access_token_expires = timedelta(
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+    access_token = security.create_access_token(
+        subject=new_user.id, expires_delta=access_token_expires
+    )
+
+    return Token(access_token=access_token)
 
 
 @router.post("/login/access-token", response_model=Token)

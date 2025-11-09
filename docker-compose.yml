@@ -33,12 +33,9 @@ services:
     env_file:
       - .env
     environment:
+      # Override database connection for Docker network
       - MYSQL_SERVER=mariadb
       - MYSQL_PORT=3306
-      - MYSQL_USER=tictactoe_user
-      - MYSQL_PASSWORD=tictactoe_pass
-      - MYSQL_DB=tictactoe
-      - ENVIRONMENT=local
     ports:
       - "8000:8000"
     volumes:

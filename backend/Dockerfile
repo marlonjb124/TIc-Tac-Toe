@@ -38,4 +38,5 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
 
 # Run database prestart check and then start the application
-CMD ["sh", "-c", "python app/backend_pre_start.py && fastapi run --workers 4 app/main.py"]
+CMD ["sh", "-c", "python app/backend_pre_start.py && fastapi dev app/main.py --host 0.0.0.0 --port 8000 --reload"]
+

@@ -3,12 +3,15 @@ FastAPI application entry point.
 Follows REST API best practices with proper versioning.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api.main import api_router
 from app.core.config import settings
+from app.core.exceptions import AppException
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -39,6 +42,53 @@ if settings.all_cors_origins:
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+# Exception handlers
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException):
+    """Handle all custom application exceptions."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error_code": exc.error_code,
+            "message": exc.message,
+            "details": exc.details,
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+):
+    """Handle validation errors from Pydantic."""
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "error_code": "VALIDATION_ERROR",
+            "message": "Invalid request data",
+            "details": exc.errors(),
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """Handle unexpected exceptions."""
+    import traceback
+
+    # Log the full traceback for debugging
+    traceback.print_exc()
+
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "message": "An unexpected error occurred",
+            "details": str(exc) if settings.DEBUG else None,
+        },
+    )
 
 
 @app.get("/health")
