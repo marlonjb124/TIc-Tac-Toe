@@ -1,100 +1,107 @@
 """
 Application configuration using Pydantic Settings.
-
+Follows the FastAPI official template pattern.
 """
 
-from typing import List, Optional
-from pydantic import Field, field_validator
+import secrets
+import warnings
+from typing import Annotated, Any, Literal
+
+from pydantic import (
+    AnyUrl,
+    BeforeValidator,
+    EmailStr,
+    computed_field,
+    model_validator,
+)
+from pydantic_core import MultiHostUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing_extensions import Self
+
+
+def parse_cors(v: Any) -> list[str] | str:
+    """Parse CORS origins from string or list."""
+    if isinstance(v, str) and not v.startswith("["):
+        return [i.strip() for i in v.split(",")]
+    elif isinstance(v, list | str):
+        return v
+    raise ValueError(v)
 
 
 class Settings(BaseSettings):
-    """
-    Application settings with validation.
-
-    This class uses Pydantic Settings to manage configuration
-    from environment variables. All settings are validated at startup
-    """
-
-    # API Configuration
-    API_V1_PREFIX: str = "/api/v1"
-    PROJECT_NAME: str = "Tic-Tac-Toe API"
-    VERSION: str = "0.1.0"
-    DEBUG: bool = False
-
-    # Database Configuration
-    DATABASE_URL: str = Field(
-        default="mysql+aiomysql://user:password@localhost:3306/tictactoe",
-        description="Database connection URL",
-    )
-    DATABASE_HOST: str = "localhost"
-    DATABASE_PORT: int = 3306
-    DATABASE_USER: str = "tictactoe_user"
-    DATABASE_PASSWORD: str = Field(default="", description="Database password")
-    DATABASE_NAME: str = "tictactoe"
-
-    # Security
-    SECRET_KEY: str = Field(
-        default="your-secret-key-change-in-production",
-        min_length=32,
-        description="Secret key for JWT token generation",
-    )
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
-    # CORS
-    BACKEND_CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:5173"],
-        description="Allowed CORS origins",
-    )
-
-    # AI Configuration
-    OPENAI_API_KEY: Optional[str] = Field(
-        default=None, description="OpenAI API key for AI opponent"
-    )
-    AI_MODEL: str = "gpt-4"
-    AI_TEMPERATURE: float = Field(default=0.7, ge=0.0, le=2.0)
-
-    # Environment
-    ENVIRONMENT: str = Field(
-        default="development", pattern="^(development|staging|production)$"
-    )
+    """Application settings with environment variable support."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=True,
+        env_file="../.env",
+        env_ignore_empty=True,
         extra="ignore",
     )
 
-    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
-    @classmethod
-    def assemble_cors_origins(cls, v: str | List[str]) -> List[str]:
-        """
-        Parse CORS origins from string or list.
+    # API Configuration
+    API_V1_STR: str = "/api/v1"
+    PROJECT_NAME: str = "Tic-Tac-Toe API"
 
-        Args:
-            v: CORS origins as string (JSON) or list
+    # Security
+    SECRET_KEY: str = secrets.token_urlsafe(32)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
+    ALGORITHM: str = "HS256"
 
-        Returns:
-            List of CORS origins
-        """
-        if isinstance(v, str):
-            import json
+    # Environment
+    ENVIRONMENT: Literal["local", "staging", "production"] = "local"
 
-            return json.loads(v)
-        return v
+    # CORS
+    FRONTEND_HOST: str = "http://localhost:5173"
+    BACKEND_CORS_ORIGINS: Annotated[
+        list[AnyUrl] | str, BeforeValidator(parse_cors)
+    ] = []
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
-    def is_production(self) -> bool:
-        """Check if running in production environment."""
-        return self.ENVIRONMENT == "production"
+    def all_cors_origins(self) -> list[str]:
+        """Get all CORS origins including frontend."""
+        return [
+            str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS
+        ] + [self.FRONTEND_HOST]
 
+    # Database - MariaDB/MySQL
+    MYSQL_SERVER: str = "localhost"
+    MYSQL_PORT: int = 3306
+    MYSQL_USER: str = "tictactoe_user"
+    MYSQL_PASSWORD: str = ""
+    MYSQL_DB: str = "tictactoe"
+
+    @computed_field  # type: ignore[prop-decorator]
     @property
-    def is_development(self) -> bool:
-        """Check if running in development environment."""
-        return self.ENVIRONMENT == "development"
+    def SQLALCHEMY_DATABASE_URI(self) -> str:
+        """Build database URI for MariaDB/MySQL with aiomysql."""
+        return MultiHostUrl.build(
+            scheme="mysql+aiomysql",
+            username=self.MYSQL_USER,
+            password=self.MYSQL_PASSWORD,
+            host=self.MYSQL_SERVER,
+            port=self.MYSQL_PORT,
+            path=self.MYSQL_DB,
+        ).unicode_string()
+
+    # First superuser
+    FIRST_SUPERUSER: EmailStr = "admin@tictactoe.com"  # type: ignore
+    FIRST_SUPERUSER_PASSWORD: str = "changethis"
+
+    @model_validator(mode="after")
+    def _check_default_secret(self) -> Self:
+        """Check if default secret is being used in production."""
+        if self.ENVIRONMENT != "local":
+            if self.SECRET_KEY == "changethis":
+                warnings.warn(
+                    "Using default SECRET_KEY in non-local environment",
+                    stacklevel=1,
+                )
+            if self.FIRST_SUPERUSER_PASSWORD == "changethis":
+                warnings.warn(
+                    "Using default superuser password in production",
+                    stacklevel=1,
+                )
+        return self
 
 
-# Singleton instance
-settings = Settings()
+settings = Settings()  # type: ignore

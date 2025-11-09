@@ -1,0 +1,39 @@
+{
+    // Editor settings
+    "editor.formatOnSave": true,
+    "editor.rulers": [79],
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+
+    // Python-specific settings
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
+    },
+
+    // Black formatter settings
+    "black-formatter.args": [
+        "--line-length",
+        "79"
+    ],
+
+    // Isort settings
+    "isort.args": [
+        "--profile",
+        "black",
+        "--line-length",
+        "79"
+    ],
+
+    // Flake8 linting
+    "flake8.args": [
+        "--max-line-length=79"
+    ],
+
+    // Python extension settings (legacy, but kept for compatibility)
+    "python.linting.enabled": true,
+    "python.linting.flake8Enabled": true
+}
