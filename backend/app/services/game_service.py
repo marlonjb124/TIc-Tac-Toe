@@ -109,6 +109,9 @@ class GameService:
         game.board = GameEngine.make_move(
             game.board, move_create.position, Player.X
         )
+        print(
+            f"After player move: board='{game.board}', position={move_create.position}"
+        )
 
         session.add(
             Move(
@@ -150,11 +153,13 @@ class GameService:
 
         if game.opponent_type == OpponentType.AI:
             # TODO: Add timeout handling for AI requests
+            print(f"Calling AI with board: '{game.board}'")
             ai_position = await ai_service.get_move(
                 board=game.board,
                 player=Player.O,
                 difficulty=game.difficulty,
             )
+            print(f"AI chose position: {ai_position}")
 
             game.board = GameEngine.make_move(
                 game.board, ai_position, Player.O

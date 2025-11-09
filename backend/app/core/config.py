@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_PASSWORD: str = "changethis123"
 
     OPENROUTER_API_KEY: str = ""
-    OPENROUTER_MODEL: str = "anthropic/claude-3.5-sonnet"
+    OPENROUTER_MODEL: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     AI_MAX_RETRIES: int = 3
     AI_TIMEOUT_SECONDS: int = 30

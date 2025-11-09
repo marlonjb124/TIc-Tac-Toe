@@ -51,21 +51,40 @@ class AIService:
             )
 
         prompt = self._build_prompt(board, player, difficulty)
+        invalid_moves = []
 
         for attempt in range(self.max_retries):
             try:
-                move = await self._call_api(prompt)
+                # Update prompt with invalid moves from previous attempts
+                if invalid_moves:
+                    available = [
+                        str(i)
+                        for i in range(9)
+                        if board[i] == " " and i not in invalid_moves
+                    ]
+                    prompt += f"\n\nWARNING: Positions {invalid_moves} are INVALID or already taken. You MUST choose from: {', '.join(available)}"
+
+                move = await self._call_api(prompt, board)
+                print(f"AI attempt {attempt + 1}: move={move}")
 
                 # Validate the move
                 if self._is_valid_move(board, move):
                     return move
                 else:
-                    # If invalid, try again
+                    # Track invalid move and try again
+                    invalid_moves.append(move)
                     if attempt < self.max_retries - 1:
+                        print(
+                            f"Invalid move {move}, retrying with updated prompt..."
+                        )
                         continue
                     raise AIServiceException(
                         message="AI returned invalid move after retries",
-                        details={"move": move, "board": board},
+                        details={
+                            "move": move,
+                            "board": board,
+                            "invalid_attempts": invalid_moves,
+                        },
                     )
 
             except httpx.HTTPError as e:
@@ -186,12 +205,13 @@ Your move:"""
 ---------
 {b[6]} | {b[7]} | {b[8]}"""
 
-    async def _call_api(self, prompt: str) -> int:
+    async def _call_api(self, prompt: str, board: str) -> int:
         """
         Call OpenRouter API and parse response.
 
         Args:
             prompt: Formatted prompt for AI
+            board: Current board state for debugging
 
         Returns:
             Move position (0-8)
@@ -228,11 +248,19 @@ Your move:"""
 
             # Extract move from response
             try:
-                print(data)
                 content = data["choices"][0]["message"]["content"].strip()
-                print(content)
-                # Try to extract number from response
-                move = int(content)
+                print(f"AI Response: '{content}' for board: '{board}'")
+
+                # Extract only the first digit found
+                import re
+
+                match = re.search(r"\d", content)
+                if not match:
+                    raise ValueError("No digit found in response")
+
+                move = int(match.group())
+                available = [i for i, c in enumerate(board) if c == " "]
+                print(f"Parsed move: {move}, Available: {available}")
                 return move
             except (KeyError, ValueError, IndexError) as e:
                 raise AIServiceException(
