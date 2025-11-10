@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCreateGame, useMakeMove, useCurrentUser } from "../hooks/useApi";
 import Board from "../components/Board";
-import type { Difficulty, MoveResponse, OpponentType } from "../types";
+import type { Difficulty, MoveResponse } from "../types";
 
 export default function GamePage() {
   const [gameId, setGameId] = useState<number | null>(null);
@@ -22,10 +22,17 @@ export default function GamePage() {
     navigate("/login");
   };
 
+  const resetToMenu = () => {
+    setGameId(null);
+    setBoard(Array(9).fill(" "));
+    setGameStatus("in_progress");
+    setWinner(null);
+    setLastMove(null);
+  };
+
   const startNewGame = async () => {
     try {
       const game = await createGameMutation.mutateAsync({
-        opponent_type: "ai" as OpponentType,
         difficulty,
       });
       console.log("Game created:", game);
@@ -121,7 +128,7 @@ export default function GamePage() {
           <div className="flex items-center gap-3">
             {gameId && (
               <button
-                onClick={startNewGame}
+                onClick={resetToMenu}
                 className="px-5 py-2 bg-gradient-to-r from-green-400 to-emerald-500 text-white rounded-xl hover:from-green-500 hover:to-emerald-600 transition-all font-semibold shadow-lg transform hover:scale-105"
               >
                 🔄 New Game
@@ -138,8 +145,8 @@ export default function GamePage() {
       </div>
 
       {/* Game Area */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-full max-w-2xl">
+      <div className="flex-1 flex items-center justify-center py-8">
+        <div className="w-full max-w-2xl flex flex-col gap-8">
           <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-2xl p-8 border border-white/20">
             {!gameId ? (
               <div className="text-center space-y-8">
@@ -148,28 +155,18 @@ export default function GamePage() {
                   <p className="text-white/70">Choose your difficulty and start the game</p>
                 </div>
 
-                <div className="max-w-xs mx-auto space-y-4">
-                  <label className="block">
-                    <span className="text-white font-semibold mb-2 block">Difficulty Level</span>
-                    <select
-                      value={difficulty}
-                      onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                      className="w-full px-4 py-3 bg-white/20 backdrop-blur border border-white/30 rounded-xl text-white font-medium focus:ring-2 focus:ring-white/50 focus:outline-none"
-                    >
-                      <option value="EASY" className="text-gray-900">🟢 Easy</option>
-                      <option value="MEDIUM" className="text-gray-900">🟡 Medium</option>
-                      <option value="HARD" className="text-gray-900">🔴 Hard</option>
-                    </select>
-                  </label>
+                <div className="flex flex-col items-center space-y-4 bg-gradient-to-br from-purple-500/30 to-pink-500/30 p-6 rounded-xl">
+                  <span className="text-white font-semibold text-lg">Difficulty Level</span>
+                  <select
+                    value={difficulty}
+                    onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+                    className="w-64 px-4 py-3 bg-white/30 backdrop-blur border border-white/40 rounded-xl text-white font-medium focus:ring-2 focus:ring-white/50 focus:outline-none text-center"
+                  >
+                    <option value="EASY" className="text-gray-900">🟢 Easy</option>
+                    <option value="MEDIUM" className="text-gray-900">🟡 Medium</option>
+                    <option value="HARD" className="text-gray-900">🔴 Hard</option>
+                  </select>
                 </div>
-
-                <button
-                  onClick={startNewGame}
-                  disabled={createGameMutation.isPending}
-                  className="px-10 py-4 bg-gradient-to-r from-green-400 to-blue-500 text-white rounded-xl hover:from-green-500 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-500 transition-all font-bold text-lg shadow-lg transform hover:scale-105 disabled:scale-100"
-                >
-                  {createGameMutation.isPending ? "Creating..." : "🎮 Start Game"}
-                </button>
               </div>
             ) : (
               <div className="space-y-6">
@@ -190,6 +187,19 @@ export default function GamePage() {
               </div>
             )}
           </div>
+
+          {/* Start Game Button */}
+          {!gameId && (
+            <div className="flex justify-center">
+              <button
+                onClick={startNewGame}
+                disabled={createGameMutation.isPending}
+                className="px-16 py-5 bg-gradient-to-r from-green-400 to-blue-500 text-white rounded-2xl hover:from-green-500 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-500 transition-all font-bold text-2xl shadow-2xl transform hover:scale-105 disabled:scale-100"
+              >
+                {createGameMutation.isPending ? "Creating..." : "🎮 Start Game"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

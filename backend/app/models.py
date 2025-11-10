@@ -19,11 +19,6 @@ class Player(str, Enum):
     O = "O"  # noqa: E741
 
 
-class OpponentType(str, Enum):
-    AI = "ai"
-    ALGORITHM = "algorithm"
-
-
 class Difficulty(str, Enum):
     EASY = "EASY"
     MEDIUM = "MEDIUM"
@@ -86,13 +81,6 @@ class TokenPayload(SQLModel):
 class GameBase(SQLModel):
     """Base game properties shared across schemas."""
 
-    opponent_type: OpponentType = Field(
-        default=OpponentType.AI,
-        description=(
-            "Type of opponent: 'ai' (OpenRouter models) or "
-            "'algorithm' (Local algorithm)"
-        ),
-    )
     difficulty: Difficulty = Field(
         default=Difficulty.MEDIUM,
         description="Difficulty level: 'EASY', 'MEDIUM', or 'HARD'",
@@ -100,16 +88,15 @@ class GameBase(SQLModel):
 
 
 # Properties to receive via API on game creation
-# it can inherate of gamebase in the future
 class GameCreate(GameBase):
     """Schema for game creation via API."""
 
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"opponent_type": "ai", "difficulty": "MEDIUM"},
-                {"opponent_type": "ai", "difficulty": "HARD"},
-                {"opponent_type": "algorithm", "difficulty": "EASY"},
+                {"difficulty": "MEDIUM"},
+                {"difficulty": "HARD"},
+                {"difficulty": "EASY"},
             ]
         }
     }

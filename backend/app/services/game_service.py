@@ -21,7 +21,6 @@ from app.models import (
     Move,
     MoveCreate,
     MovePublic,
-    OpponentType,
     Player,
 )
 from app.services.ai_service import ai_service
@@ -59,8 +58,8 @@ class GameService:
         statement = select(Game).where(
             Game.id == game_id, Game.user_id == user_id
         )
-        result = await session.execute(statement)
-        game = result.scalar_one_or_none()
+        result = await session.exec(statement)
+        game = result.one_or_none()
 
         if not game:
             raise NotFoundException(
@@ -81,8 +80,8 @@ class GameService:
         statement = select(Game).where(
             Game.id == game_id, Game.user_id == user_id
         )
-        result = await session.execute(statement)
-        game = result.scalar_one_or_none()
+        result = await session.exec(statement)
+        game = result.one_or_none()
 
         if not game:
             raise NotFoundException(
@@ -151,34 +150,31 @@ class GameService:
 
         ai_position: Optional[int] = None
 
-        if game.opponent_type == OpponentType.AI:
-            # TODO: Add timeout handling for AI requests
-            print(f"Calling AI with board: '{game.board}'")
-            ai_position = await ai_service.get_move(
-                board=game.board,
+        # Always use AI opponent
+        print(f"Calling AI with board: '{game.board}'")
+        ai_position = await ai_service.get_move(
+            board=game.board,
+            player=Player.O,
+            difficulty=game.difficulty,
+        )
+        print(f"AI chose position: {ai_position}")
+
+        game.board = GameEngine.make_move(game.board, ai_position, Player.O)
+
+        session.add(
+            Move(
+                game_id=game.id,
+                position=ai_position,
                 player=Player.O,
-                difficulty=game.difficulty,
             )
-            print(f"AI chose position: {ai_position}")
+        )
 
-            game.board = GameEngine.make_move(
-                game.board, ai_position, Player.O
-            )
-
-            session.add(
-                Move(
-                    game_id=game.id,
-                    position=ai_position,
-                    player=Player.O,
-                )
-            )
-
-            winner = GameEngine.check_winner(game.board)
-            if winner:
-                game.status = GameStatus.FINISHED
-                game.winner = winner
-            elif GameEngine.is_board_full(game.board):
-                game.status = GameStatus.DRAW
+        winner = GameEngine.check_winner(game.board)
+        if winner:
+            game.status = GameStatus.FINISHED
+            game.winner = winner
+        elif GameEngine.is_board_full(game.board):
+            game.status = GameStatus.DRAW
 
         await session.commit()
         await session.refresh(game)
@@ -207,8 +203,8 @@ class GameService:
             .offset(skip)
             .limit(limit)
         )
-        result = await session.execute(statement)
-        games = result.scalars().all()
+        result = await session.exec(statement)
+        games = result.all()
 
         return [self._to_public(game) for game in games]
 

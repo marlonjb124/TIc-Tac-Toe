@@ -87,11 +87,24 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER: EmailStr = "admin@tictactoe.com"  # type: ignore
     FIRST_SUPERUSER_PASSWORD: str = "changethis123"
 
-    OPENROUTER_API_KEY: str = ""
+    # OpenRouter API Keys - Multiple keys for rotation
+    OPENROUTER_API_KEYS: str = ""  # Comma-separated list of keys
     OPENROUTER_MODEL: str = ""
     OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     AI_MAX_RETRIES: int = 3
     AI_TIMEOUT_SECONDS: int = 30
+
+    @computed_field  # type: ignore
+    @property
+    def api_keys_list(self) -> list[str]:
+        """Parse comma-separated API keys into a list."""
+        if not self.OPENROUTER_API_KEYS:
+            return []
+        return [
+            key.strip()
+            for key in self.OPENROUTER_API_KEYS.split(",")
+            if key.strip()
+        ]
 
     @model_validator(mode="after")
     def _check_default_secret(self) -> Self:

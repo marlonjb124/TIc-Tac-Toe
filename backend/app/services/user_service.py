@@ -17,16 +17,16 @@ class UserService:
     ) -> Optional[User]:
         """Get user by ID."""
         statement = select(User).where(User.id == user_id)
-        result = await session.execute(statement)
-        return result.scalar_one_or_none()
+        result = await session.exec(statement)
+        return result.one_or_none()
 
     async def get_by_email(
         self, session: AsyncSession, email: str
     ) -> Optional[User]:
         """Get user by email."""
         statement = select(User).where(User.email == email)
-        result = await session.execute(statement)
-        return result.scalar_one_or_none()
+        result = await session.exec(statement)
+        return result.one_or_none()
 
     async def create(
         self,

@@ -14,15 +14,31 @@ class AIService:
     """
     Service for AI-powered Tic-Tac-Toe opponent.
     Uses OpenRouter API to generate intelligent moves based on board state.
+    With automatic API key rotation to handle rate limits.
     """
 
     def __init__(self) -> None:
         """Initialize AI service with configuration."""
-        self.api_key = settings.OPENROUTER_API_KEY
+        self.api_keys = settings.api_keys_list
+        self.current_key_index = 0
         self.model = settings.OPENROUTER_MODEL
         self.base_url = settings.OPENROUTER_BASE_URL
         self.max_retries = settings.AI_MAX_RETRIES
         self.timeout = settings.AI_TIMEOUT_SECONDS
+
+    def _get_next_api_key(self) -> str:
+        """Get next API key in rotation."""
+        if not self.api_keys:
+            raise AIServiceException(
+                message="No OpenRouter API keys configured",
+                details={"config": "OPENROUTER_API_KEYS is required"},
+            )
+
+        key = self.api_keys[self.current_key_index]
+        self.current_key_index = (self.current_key_index + 1) % len(
+            self.api_keys
+        )
+        return key
 
     async def get_move(
         self,
@@ -44,14 +60,23 @@ class AIService:
         Raises:
             AIServiceException: If AI service fails or returns invalid move
         """
-        if not self.api_key:
-            raise AIServiceException(
-                message="OpenRouter API key not configured",
-                details={"config": "OPENROUTER_API_KEY is required"},
+        # FAST PATH: Check if AI can win immediately (before calling API)
+        opponent_mark = "X" if player == Player.O else "O"
+        player_mark = player.value
+        quick_threats = self._analyze_threats(
+            board, opponent_mark, player_mark
+        )
+
+        if quick_threats["you_can_win"]:
+            winning_move = quick_threats["your_win_pos"]
+            print(
+                f"⚡ INSTANT WIN detected at position {winning_move} - taking it without API call"
             )
+            return winning_move
 
         prompt = self._build_prompt(board, player, difficulty)
         invalid_moves = []
+        last_error = None
 
         for attempt in range(self.max_retries):
             try:
@@ -87,7 +112,25 @@ class AIService:
                         },
                     )
 
+            except httpx.HTTPStatusError as e:
+                last_error = e
+                print(
+                    f"API call failed (attempt {attempt + 1}): "
+                    f"{e.response.status_code} - Rotating to next key..."
+                )
+                if attempt < self.max_retries - 1:
+                    continue
+                raise AIServiceException(
+                    message="Failed to get AI response",
+                    details={
+                        "error": str(e),
+                        "status_code": e.response.status_code,
+                        "attempt": attempt + 1,
+                    },
+                )
             except httpx.HTTPError as e:
+                last_error = e
+                print(f"HTTP error (attempt {attempt + 1}): {str(e)}")
                 if attempt < self.max_retries - 1:
                     continue
                 raise AIServiceException(
@@ -97,7 +140,10 @@ class AIService:
 
         raise AIServiceException(
             message="Max retries exceeded",
-            details={"retries": self.max_retries},
+            details={
+                "retries": self.max_retries,
+                "last_error": str(last_error) if last_error else None,
+            },
         )
 
     def _build_prompt(
@@ -123,17 +169,17 @@ class AIService:
 
         difficulty_instructions = {
             Difficulty.EASY: (
-                "Play casually. Prioritize random moves over strategy. "
-                "Only block obvious wins occasionally."
+                "Play casually with some mistakes. "
+                "You should still block obvious wins 50% of the time."
             ),
             Difficulty.MEDIUM: (
-                "Play strategically. Block opponent wins and take your "
-                "own winning moves when available, but don't plan ahead "
-                "more than one move."
+                "Play competitively. ALWAYS block opponent wins. "
+                "ALWAYS take your own winning moves. "
+                "Use basic strategy but don't plan too far ahead."
             ),
             Difficulty.HARD: (
-                "Play optimally using perfect strategy. Never lose. "
-                "Always think several moves ahead."
+                "Play perfectly. NEVER miss a block. NEVER miss a win. "
+                "Use optimal minimax strategy. Think 3+ moves ahead."
             ),
         }
 
@@ -143,14 +189,27 @@ class AIService:
 
         player_mark = player.value
 
-        prompt = f"""You are an expert Tic-Tac-Toe player. \
-You are '{player_mark}'.
+        # Check for immediate threats
+        threats = self._analyze_threats(board, opponent, player_mark)
+        threat_warning = ""
+
+        # PRIORITY 1: If AI can win, emphasize it FIRST (most important)
+        if threats["you_can_win"]:
+            threat_warning = f"\n🎯 WINNING MOVE AVAILABLE: Position {threats['your_win_pos']} wins the game! TAKE IT NOW!"
+            # Add block warning as secondary if both exist
+            if threats["opponent_can_win"]:
+                threat_warning += f"\n(Note: Opponent also threatens position {threats['opponent_win_pos']}, but WIN takes priority)"
+        # PRIORITY 2: If only opponent can win, block it
+        elif threats["opponent_can_win"]:
+            threat_warning = f"\n⚠️ CRITICAL BLOCK: Opponent can WIN at position {threats['opponent_win_pos']}! YOU MUST BLOCK THIS!"
+
+        prompt = f"""You are playing Tic-Tac-Toe as '{player_mark}' against '{opponent}'.
 
 CURRENT BOARD:
 {board_visual}
 
 AVAILABLE POSITIONS: {available_str}
-(You can ONLY choose from these empty positions)
+{threat_warning}
 
 POSITION REFERENCE:
 0 | 1 | 2
@@ -159,42 +218,66 @@ POSITION REFERENCE:
 ---------
 6 | 7 | 8
 
-WINNING COMBINATIONS:
+WINNING COMBINATIONS TO CHECK:
 Rows: [0,1,2], [3,4,5], [6,7,8]
-Columns: [0,3,6], [1,4,7], [2,5,8]
-Diagonals: [0,4,8], [2,4,6]
+Cols: [0,3,6], [1,4,7], [2,5,8]
+Diags: [0,4,8], [2,4,6]
 
-STRATEGY RULES (Priority Order):
-1. WIN: If you have 2 in a row, take the winning position
-2. BLOCK: If opponent '{opponent}' has 2 in a row, block them
-3. FORK: Create two winning threats at once
-4. BLOCK FORK: Prevent opponent from creating a fork
-5. CENTER: Take center (4) if available - strongest position
-6. OPPOSITE CORNER: If opponent is in a corner, take opposite corner
-7. EMPTY CORNER: Take any corner (0,2,6,8)
-8. EMPTY SIDE: Take any side (1,3,5,7)
+MANDATORY RULES (CHECK IN ORDER):
+1. ✓ WIN NOW: If you have 2 '{player_mark}' in any line, TAKE the 3rd position to WIN
+2. ⚠️ BLOCK NOW: If opponent has 2 '{opponent}' in any line, BLOCK the 3rd position IMMEDIATELY
+3. Center (4): Best position if available
+4. Corners (0,2,6,8): Strong positions
+5. Sides (1,3,5,7): Weakest positions
 
-EXAMPLES:
-- Board "X X  O    " → You MUST play position 2 to WIN [0,1,2]
-- Board "O X X     " → You MUST play position 0 to BLOCK [0,1,2]
-- Board "X   O   X" → You MUST play position 4 to BLOCK diagonal
-- Board "         " → Play position 4 (center) - best first move
-- Board "X        " → Play position 4 (center) or corner (2,6,8)
+STEP-BY-STEP ANALYSIS:
+1. Check ALL 8 winning combinations for 2 '{player_mark}' + 1 empty -> WIN there
+2. Check ALL 8 winning combinations for 2 '{opponent}' + 1 empty -> BLOCK there
+3. If neither, take center (4) or a corner
 
 DIFFICULTY: {difficulty.value}
 INSTRUCTIONS: {instruction}
 
-ANALYZE the current board state carefully:
-- Check for immediate winning moves
-- Check if opponent can win next turn (MUST BLOCK)
-- Look for fork opportunities
-- Consider center and corner positions
-
-Respond with ONLY ONE NUMBER (0-8) - no text, no explanation.
+Think carefully. Analyze the board. Then respond with ONLY ONE NUMBER (0-8).
 
 Your move:"""
 
         return prompt
+
+    def _analyze_threats(self, board: str, opponent: str, player: str) -> dict:
+        """Analyze board for immediate threats and opportunities."""
+        lines = [
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],  # Rows
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],  # Cols
+            [0, 4, 8],
+            [2, 4, 6],  # Diagonals
+        ]
+
+        result = {
+            "opponent_can_win": False,
+            "opponent_win_pos": None,
+            "you_can_win": False,
+            "your_win_pos": None,
+        }
+
+        for line in lines:
+            cells = [board[i] for i in line]
+
+            # Check if opponent can win
+            if cells.count(opponent) == 2 and cells.count(" ") == 1:
+                result["opponent_can_win"] = True
+                result["opponent_win_pos"] = line[cells.index(" ")]
+
+            # Check if AI can win
+            if cells.count(player) == 2 and cells.count(" ") == 1:
+                result["you_can_win"] = True
+                result["your_win_pos"] = line[cells.index(" ")]
+
+        return result
 
     def _format_board_for_display(self, board: str) -> str:
         """Format board as visual grid for AI."""
@@ -219,8 +302,13 @@ Your move:"""
         Raises:
             AIServiceException: If API call fails or response is invalid
         """
+        # Get next API key from rotation
+        api_key = self._get_next_api_key()
+        key_suffix = api_key[-8:] if len(api_key) > 8 else api_key
+        print(f"Using API key ending in ...{key_suffix}")
+
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
 
@@ -233,23 +321,43 @@ Your move:"""
                 }
             ],
             "temperature": 0.7,
-            "max_tokens": 10,
+            "max_tokens": 20,  # Increased from 10 to meet minimum of 16
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
+            print(f"Calling OpenRouter API: {self.base_url}/chat/completions")
+            print(f"Model: {self.model}")
+            print(f"Prompt length: {len(prompt)} characters")
+
             response = await client.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
             )
+
+            print(f"Response status code: {response.status_code}")
+            print(f"Response headers: {dict(response.headers)}")
+
+            # Log response body before raising errors
+            try:
+                response_text = response.text
+                print(
+                    f"Response body: {response_text[:500]}..."
+                )  # First 500 chars
+            except Exception as e:
+                print(f"Could not read response body: {e}")
+
             response.raise_for_status()
 
             data = response.json()
+            print(f"Parsed JSON response: {data}")
 
             # Extract move from response
             try:
                 content = data["choices"][0]["message"]["content"].strip()
-                print(f"AI Response: '{content}' for board: '{board}'")
+                print(
+                    f"AI Response: '{content}' (Key #{self.current_key_index})"
+                )
 
                 # Extract only the first digit found
                 import re

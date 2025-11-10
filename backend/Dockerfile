@@ -37,6 +37,9 @@ COPY ./app /app/app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
 
-# Run database prestart check and then start the application
-CMD ["sh", "-c", "python app/backend_pre_start.py && fastapi dev app/main.py --host 0.0.0.0 --port 8000 --reload"]
+# Make prestart script executable
+RUN chmod +x /app/scripts/prestart.sh
+
+# Run prestart script (migrations + initial data) and then start the application
+CMD ["sh", "-c", "/app/scripts/prestart.sh && fastapi dev app/main.py --host 0.0.0.0 --port 8000 --reload"]
 

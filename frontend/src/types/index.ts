@@ -18,7 +18,6 @@ export interface User {
 
 export type GameStatus = "in_progress" | "finished" | "draw";
 export type Player = "X" | "O";
-export type OpponentType = "ai" | "algorithm";
 export type Difficulty = "EASY" | "MEDIUM" | "HARD";
 
 export interface Game {
@@ -28,14 +27,12 @@ export interface Game {
   status: GameStatus;
   current_player: Player;
   winner: Player | null;
-  opponent_type: OpponentType;
   difficulty: Difficulty;
   created_at: string;
   updated_at: string;
 }
 
 export interface GameCreate {
-  opponent_type: OpponentType;
   difficulty: Difficulty;
 }
 

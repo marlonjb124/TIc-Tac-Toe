@@ -42,12 +42,12 @@ async def list_users(
     """
     # Get users with pagination
     statement = select(User).offset(skip).limit(limit)
-    result = await session.execute(statement)
-    users = result.scalars().all()
+    result = await session.exec(statement)
+    users = result.all()
 
     count_statement = select(func.count()).select_from(User)
-    count_result = await session.execute(count_statement)
-    count = count_result.scalar() or 0
+    count_result = await session.exec(count_statement)
+    count = count_result.one()
 
     return UsersPublic(data=list(users), count=count)
 
