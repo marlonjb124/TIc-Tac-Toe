@@ -10,7 +10,6 @@ import sqlalchemy as sa
 import sqlmodel.sql.sqltypes
 from alembic import op
 
-# revision identifiers, used by Alembic.
 revision = "3b2e190b1663"
 down_revision = None
 branch_labels = None
@@ -18,7 +17,6 @@ depends_on = None
 
 
 def upgrade():
-    """Create user table."""
     op.create_table(
         "user",
         sa.Column(
@@ -47,6 +45,5 @@ def upgrade():
 
 
 def downgrade():
-    """Drop user table."""
     op.drop_index(op.f("ix_user_email"), table_name="user")
     op.drop_table("user")

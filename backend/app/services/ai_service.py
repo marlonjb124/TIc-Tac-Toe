@@ -1,7 +1,4 @@
-"""
-AI Service for Tic-Tac-Toe opponent using OpenRouter API.
-Implements Dependency Inversion Principle (SOLID).
-"""
+"""AI opponent for Tic-Tac-Toe using OpenRouter API."""
 
 import httpx
 
@@ -14,14 +11,7 @@ logger = get_logger(__name__)
 
 
 class AIService:
-    """
-    Service for AI-powered Tic-Tac-Toe opponent.
-    Uses OpenRouter API to generate intelligent moves based on board state.
-    With automatic API key rotation to handle rate limits.
-    """
-
     def __init__(self) -> None:
-        """Initialize AI service with configuration."""
         self.api_keys = settings.api_keys_list
         self.current_key_index = 0
         self.model = settings.OPENROUTER_MODEL
@@ -30,7 +20,6 @@ class AIService:
         self.timeout = settings.AI_TIMEOUT_SECONDS
 
     def _get_next_api_key(self) -> str:
-        """Get next API key in rotation."""
         if not self.api_keys:
             raise AIServiceException(
                 message="No OpenRouter API keys configured",
@@ -49,80 +38,57 @@ class AIService:
         player: Player,
         difficulty: Difficulty = Difficulty.MEDIUM,
     ) -> int:
-        """
-        Get AI's next move for the current board state.
-
-        Args:
-            board: Current board state (9-character string)
-            player: AI's player marker (X or O)
-            difficulty: Difficulty level (easy, medium, hard)
-
-        Returns:
-            Position index (0-8) for AI's move
-
-        Raises:
-            AIServiceException: If AI service fails or returns invalid move
-        """
-        # FAST PATH: Check if AI can win immediately (before calling API)
         opponent_mark = "X" if player == Player.O else "O"
         player_mark = player.value
-        quick_threats = self._analyze_threats(
-            board, opponent_mark, player_mark
-        )
+        threats = self._analyze_threats(board, opponent_mark, player_mark)
 
-        if quick_threats["you_can_win"]:
-            winning_move = quick_threats["your_win_pos"]
-            logger.info(
-                f"Instant win detected at position {winning_move} for {player.value}"
-            )
-            return winning_move
+        if threats["you_can_win"]:
+            winning_pos = threats["your_win_pos"]
+            logger.info(f"Instant win at {winning_pos} for {player.value}")
+            return winning_pos
 
         prompt = self._build_prompt(board, player, difficulty)
-        invalid_moves = []
+        invalid_positions = []
         last_error = None
 
         for attempt in range(self.max_retries):
             try:
-                # Update prompt with invalid moves from previous attempts
-                if invalid_moves:
+                if invalid_positions:
                     available = [
                         str(i)
                         for i in range(9)
-                        if board[i] == " " and i not in invalid_moves
+                        if board[i] == " " and i not in invalid_positions
                     ]
-                    prompt += f"\n\nWARNING: Positions {invalid_moves} are INVALID or already taken. You MUST choose from: {', '.join(available)}"
+                    prompt += f"\n\nWARNING: Positions {invalid_positions} are INVALID. Choose from: {', '.join(available)}"
 
-                move = await self._call_api(prompt, board)
-                logger.debug(f"AI attempt {attempt + 1}: move={move}")
+                position = await self._call_api(prompt, board)
+                logger.debug(f"AI attempt {attempt + 1}: position={position}")
 
-                # Validate the move
-                if self._is_valid_move(board, move):
+                if self._is_valid_move(board, position):
                     logger.info(
-                        f"AI selected valid move: {move} (difficulty: {difficulty.value})"
+                        f"AI selected position {position} (difficulty: {difficulty.value})"
                     )
-                    return move
+                    return position
                 else:
-                    # Track invalid move and try again
-                    invalid_moves.append(move)
+                    invalid_positions.append(position)
                     if attempt < self.max_retries - 1:
                         logger.warning(
-                            f"Invalid move {move}, retrying with updated prompt..."
+                            f"Invalid position {position}, retrying..."
                         )
                         continue
                     raise AIServiceException(
                         message="AI returned invalid move after retries",
                         details={
-                            "move": move,
+                            "move": position,
                             "board": board,
-                            "invalid_attempts": invalid_moves,
+                            "invalid_attempts": invalid_positions,
                         },
                     )
 
             except httpx.HTTPStatusError as e:
                 last_error = e
                 logger.error(
-                    f"API call failed (attempt {attempt + 1}): "
-                    f"{e.response.status_code} - Rotating to next key..."
+                    f"API {e.response.status_code} (attempt {attempt + 1}), rotating key..."
                 )
                 if attempt < self.max_retries - 1:
                     continue
@@ -155,38 +121,15 @@ class AIService:
     def _build_prompt(
         self, board: str, player: Player, difficulty: Difficulty
     ) -> str:
-        """
-        Build prompt for AI model.
-
-        Args:
-            board: Current board state
-            player: AI's player marker
-            difficulty: Difficulty level
-
-        Returns:
-            Formatted prompt string
-        """
         board_visual = self._format_board_for_display(board)
         opponent = "X" if player == Player.O else "O"
-
-        # Get available positions
         available = [str(i) for i, cell in enumerate(board) if cell == " "]
         available_str = ", ".join(available)
 
         difficulty_instructions = {
-            Difficulty.EASY: (
-                "Play casually with some mistakes. "
-                "You should still block obvious wins 50% of the time."
-            ),
-            Difficulty.MEDIUM: (
-                "Play competitively. ALWAYS block opponent wins. "
-                "ALWAYS take your own winning moves. "
-                "Use basic strategy but don't plan too far ahead."
-            ),
-            Difficulty.HARD: (
-                "Play perfectly. NEVER miss a block. NEVER miss a win. "
-                "Use optimal minimax strategy. Think 3+ moves ahead."
-            ),
+            Difficulty.EASY: "Play casually. Block obvious wins 50% of the time.",
+            Difficulty.MEDIUM: "ALWAYS block opponent wins. ALWAYS take your wins. Use basic strategy.",
+            Difficulty.HARD: "Play perfectly. NEVER miss blocks or wins. Think 3+ moves ahead.",
         }
 
         instruction = difficulty_instructions.get(
@@ -194,18 +137,13 @@ class AIService:
         )
 
         player_mark = player.value
-
-        # Check for immediate threats
         threats = self._analyze_threats(board, opponent, player_mark)
         threat_warning = ""
 
-        # PRIORITY 1: If AI can win, emphasize it FIRST (most important)
         if threats["you_can_win"]:
             threat_warning = f"\n🎯 WINNING MOVE AVAILABLE: Position {threats['your_win_pos']} wins the game! TAKE IT NOW!"
-            # Add block warning as secondary if both exist
             if threats["opponent_can_win"]:
                 threat_warning += f"\n(Note: Opponent also threatens position {threats['opponent_win_pos']}, but WIN takes priority)"
-        # PRIORITY 2: If only opponent can win, block it
         elif threats["opponent_can_win"]:
             threat_warning = f"\n⚠️ CRITICAL BLOCK: Opponent can WIN at position {threats['opponent_win_pos']}! YOU MUST BLOCK THIS!"
 
@@ -251,16 +189,15 @@ Your move:"""
         return prompt
 
     def _analyze_threats(self, board: str, opponent: str, player: str) -> dict:
-        """Analyze board for immediate threats and opportunities."""
         lines = [
             [0, 1, 2],
             [3, 4, 5],
-            [6, 7, 8],  # Rows
+            [6, 7, 8],
             [0, 3, 6],
             [1, 4, 7],
-            [2, 5, 8],  # Cols
+            [2, 5, 8],
             [0, 4, 8],
-            [2, 4, 6],  # Diagonals
+            [2, 4, 6],
         ]
 
         result = {
@@ -273,12 +210,10 @@ Your move:"""
         for line in lines:
             cells = [board[i] for i in line]
 
-            # Check if opponent can win
             if cells.count(opponent) == 2 and cells.count(" ") == 1:
                 result["opponent_can_win"] = True
                 result["opponent_win_pos"] = line[cells.index(" ")]
 
-            # Check if AI can win
             if cells.count(player) == 2 and cells.count(" ") == 1:
                 result["you_can_win"] = True
                 result["your_win_pos"] = line[cells.index(" ")]
@@ -286,7 +221,6 @@ Your move:"""
         return result
 
     def _format_board_for_display(self, board: str) -> str:
-        """Format board as visual grid for AI."""
         b = list(board)
         return f"""{b[0]} | {b[1]} | {b[2]}
 ---------
@@ -295,23 +229,9 @@ Your move:"""
 {b[6]} | {b[7]} | {b[8]}"""
 
     async def _call_api(self, prompt: str, board: str) -> int:
-        """
-        Call OpenRouter API and parse response.
-
-        Args:
-            prompt: Formatted prompt for AI
-            board: Current board state for debugging
-
-        Returns:
-            Move position (0-8)
-
-        Raises:
-            AIServiceException: If API call fails or response is invalid
-        """
-        # Get next API key from rotation
         api_key = self._get_next_api_key()
         key_suffix = api_key[-8:] if len(api_key) > 8 else api_key
-        logger.debug(f"Using API key ending in ...{key_suffix}")
+        logger.debug(f"Using API key ...{key_suffix}")
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -320,23 +240,14 @@ Your move:"""
 
         payload = {
             "model": self.model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
+            "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.7,
-            "max_tokens": 20,  # Increased from 10 to meet minimum of 16
+            "max_tokens": 20,
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            logger.debug(
-                f"Calling OpenRouter API: {self.base_url}/chat/completions"
-            )
-            logger.debug(
-                f"Model: {self.model}, Prompt length: {len(prompt)} chars"
-            )
+            logger.debug(f"Calling {self.base_url}/chat/completions")
+            logger.debug(f"Model: {self.model}, Prompt: {len(prompt)} chars")
 
             response = await client.post(
                 f"{self.base_url}/chat/completions",
@@ -346,61 +257,46 @@ Your move:"""
 
             logger.debug(f"Response status: {response.status_code}")
 
-            # Log response body before raising errors
             try:
                 response_text = response.text
-                logger.debug(f"Response body: {response_text[:500]}...")
+                logger.debug(f"Response: {response_text[:500]}...")
             except Exception as e:
-                logger.warning(f"Could not read response body: {e}")
+                logger.warning(f"Could not read response: {e}")
 
             response.raise_for_status()
 
-            data = response.json()
-            logger.debug(f"Parsed JSON response: {data}")
+            json_response = response.json()
+            logger.debug(f"Parsed JSON: {json_response}")
 
-            # Extract move from response
             try:
-                content = data["choices"][0]["message"]["content"].strip()
+                content = json_response["choices"][0]["message"][
+                    "content"
+                ].strip()
                 logger.debug(
-                    f"AI Response: '{content}' (Key #{self.current_key_index})"
+                    f"AI response: '{content}' (Key #{self.current_key_index})"
                 )
 
-                # Extract only the first digit found
                 import re
 
                 match = re.search(r"\d", content)
                 if not match:
-                    raise ValueError("No digit found in response")
+                    raise ValueError("No digit in response")
 
-                move = int(match.group())
+                position = int(match.group())
                 available = [i for i, c in enumerate(board) if c == " "]
-                logger.debug(f"Parsed move: {move}, Available: {available}")
-                return move
+                logger.debug(f"Parsed: {position}, Available: {available}")
+                return position
             except (KeyError, ValueError, IndexError) as e:
-                logger.error(f"Failed to parse AI response: {str(e)}")
+                logger.error(f"Failed to parse response: {str(e)}")
                 raise AIServiceException(
                     message="Failed to parse AI response",
-                    details={
-                        "response": data,
-                        "error": str(e),
-                    },
+                    details={"response": json_response, "error": str(e)},
                 )
 
-    def _is_valid_move(self, board: str, move: int) -> bool:
-        """
-        Validate if move is legal.
-
-        Args:
-            board: Current board state
-            move: Position to check
-
-        Returns:
-            True if valid, False otherwise
-        """
-        if move < 0 or move > 8:
+    def _is_valid_move(self, board: str, position: int) -> bool:
+        if position < 0 or position > 8:
             return False
-        return board[move] == " "
+        return board[position] == " "
 
 
-# Singleton instance
 ai_service = AIService()

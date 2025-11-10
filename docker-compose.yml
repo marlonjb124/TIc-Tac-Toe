@@ -38,6 +38,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend/app:/app/app
+      - ./backend/logs:/app/logs  # Logs disponibles en tu máquina
     depends_on:
       mariadb:
         condition: service_healthy

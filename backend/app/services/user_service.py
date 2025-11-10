@@ -13,12 +13,9 @@ logger = get_logger(__name__)
 
 
 class UserService:
-    """Handles user operations and authentication."""
-
     async def get_by_id(
         self, session: AsyncSession, user_id: int
     ) -> Optional[User]:
-        """Get user by ID."""
         statement = select(User).where(User.id == user_id)
         result = await session.exec(statement)
         return result.one_or_none()
@@ -26,45 +23,36 @@ class UserService:
     async def get_by_email(
         self, session: AsyncSession, email: str
     ) -> Optional[User]:
-        """Get user by email."""
         statement = select(User).where(User.email == email)
         result = await session.exec(statement)
         return result.one_or_none()
 
     async def create(
-        self,
-        session: AsyncSession,
-        user_create: UserCreate,
+        self, session: AsyncSession, user_create: UserCreate
     ) -> User:
-        """Create new user."""
-        hashed_password = security.get_password_hash(user_create.password)
-
+        hashed_pw = security.get_password_hash(user_create.password)
         user_data = user_create.model_dump(exclude={"password"})
-        db_user = User(**user_data, hashed_password=hashed_password)
+        new_user = User(**user_data, hashed_password=hashed_pw)
 
-        session.add(db_user)
+        session.add(new_user)
         await session.commit()
-        await session.refresh(db_user)
+        await session.refresh(new_user)
 
-        logger.info(f"User created: {db_user.email} (id={db_user.id})")
+        logger.info(f"User created: {new_user.email} (id={new_user.id})")
 
-        return db_user
+        return new_user
 
     async def update(
-        self,
-        session: AsyncSession,
-        db_user: User,
-        user_update: UserUpdate,
+        self, session: AsyncSession, db_user: User, user_update: UserUpdate
     ) -> User:
-        """Update user information."""
-        update_data = user_update.model_dump(exclude_unset=True)
+        updates = user_update.model_dump(exclude_unset=True)
 
-        if "password" in update_data:
-            update_data["hashed_password"] = security.get_password_hash(
-                update_data.pop("password")
+        if "password" in updates:
+            updates["hashed_password"] = security.get_password_hash(
+                updates.pop("password")
             )
 
-        for field, value in update_data.items():
+        for field, value in updates.items():
             setattr(db_user, field, value)
 
         await session.commit()
@@ -75,7 +63,6 @@ class UserService:
     async def authenticate(
         self, session: AsyncSession, email: str, password: str
     ) -> Optional[User]:
-        """Authenticate user with email and password."""
         user = await self.get_by_email(session, email)
 
         if not user:

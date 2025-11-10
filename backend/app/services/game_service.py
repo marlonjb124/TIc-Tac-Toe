@@ -1,6 +1,4 @@
-"""
-Game service for Tic-Tac-Toe business logic.
-"""
+"""Game service for Tic-Tac-Toe business logic."""
 
 from typing import Optional
 
@@ -30,15 +28,12 @@ logger = get_logger(__name__)
 
 
 class GameService:
-    """Manages game operations and AI interactions."""
-
     async def create_game(
         self,
         session: AsyncSession,
         user_id: int,
         game_create: GameCreate,
     ) -> GamePublic:
-        """Start a new game session."""
         game_data = game_create.model_dump()
         game = Game(
             **game_data,
@@ -53,8 +48,7 @@ class GameService:
         await session.refresh(game)
 
         logger.info(
-            f"New game created: id={game.id}, user_id={user_id}, "
-            f"difficulty={game.difficulty.value}"
+            f"New game: id={game.id}, user={user_id}, difficulty={game.difficulty.value}"
         )
 
         return self._to_public(game)
@@ -62,7 +56,6 @@ class GameService:
     async def get_game(
         self, session: AsyncSession, game_id: int, user_id: int
     ) -> GamePublic:
-        """Fetch game details for the user."""
         statement = select(Game).where(
             Game.id == game_id, Game.user_id == user_id
         )
@@ -71,7 +64,7 @@ class GameService:
 
         if not game:
             raise NotFoundException(
-                message=f"Game with id {game_id} not found",
+                message=f"Game {game_id} not found",
                 details={"game_id": game_id},
             )
 
@@ -84,7 +77,6 @@ class GameService:
         user_id: int,
         move_create: MoveCreate,
     ) -> MovePublic:
-        """Process player move and trigger AI response."""
         statement = select(Game).where(
             Game.id == game_id, Game.user_id == user_id
         )
@@ -93,20 +85,19 @@ class GameService:
 
         if not game:
             raise NotFoundException(
-                message=f"Game with id {game_id} not found",
+                message=f"Game {game_id} not found",
                 details={"game_id": game_id},
             )
 
         if game.status != GameStatus.IN_PROGRESS:
             raise GameOverException(
-                message="Game is already finished",
+                message="Game already finished",
                 details={"status": game.status, "winner": game.winner},
             )
 
-        # Validate move
         if not GameEngine.is_valid_move(game.board, move_create.position):
             raise InvalidMoveException(
-                message=f"Position {move_create.position} is not available",
+                message=f"Position {move_create.position} not available",
                 details={
                     "position": move_create.position,
                     "board": GameEngine.board_to_list(game.board),
@@ -117,15 +108,12 @@ class GameService:
             game.board, move_create.position, Player.X
         )
         logger.debug(
-            f"Player move: position={move_create.position}, "
-            f"board='{game.board}'"
+            f"Player move: {move_create.position}, board='{game.board}'"
         )
 
         session.add(
             Move(
-                game_id=game.id,
-                position=move_create.position,
-                player=Player.X,
+                game_id=game.id, position=move_create.position, player=Player.X
             )
         )
 
@@ -135,7 +123,7 @@ class GameService:
             game.winner = winner
             await session.commit()
             await session.refresh(game)
-            logger.info(f"Game {game.id} finished - Winner: {winner.value}")
+            logger.info(f"Game {game.id} finished - {winner.value} wins")
 
             return MovePublic(
                 position=move_create.position,
@@ -149,7 +137,7 @@ class GameService:
             game.status = GameStatus.DRAW
             await session.commit()
             await session.refresh(game)
-            logger.info(f"Game {game.id} ended in draw")
+            logger.info(f"Game {game.id} draw")
 
             return MovePublic(
                 position=move_create.position,
@@ -161,7 +149,6 @@ class GameService:
 
         ai_position: Optional[int] = None
 
-        # Always use AI opponent
         logger.debug(f"Requesting AI move for game {game.id}")
         ai_position = await ai_service.get_move(
             board=game.board,
@@ -169,18 +156,13 @@ class GameService:
             difficulty=game.difficulty,
         )
         logger.info(
-            f"AI move for game {game.id}: position={ai_position}, "
-            f"difficulty={game.difficulty.value}"
+            f"AI move {game.id}: {ai_position} ({game.difficulty.value})"
         )
 
         game.board = GameEngine.make_move(game.board, ai_position, Player.O)
 
         session.add(
-            Move(
-                game_id=game.id,
-                position=ai_position,
-                player=Player.O,
-            )
+            Move(game_id=game.id, position=ai_position, player=Player.O)
         )
 
         winner = GameEngine.check_winner(game.board)
@@ -209,7 +191,6 @@ class GameService:
         skip: int = 0,
         limit: int = 100,
     ) -> list[GamePublic]:
-        """Get user's game history."""
         statement = (
             select(Game)
             .where(Game.user_id == user_id)

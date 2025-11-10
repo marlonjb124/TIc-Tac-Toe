@@ -78,10 +78,13 @@ pnpm run dev
 ├── backend/              # API FastAPI
 │   ├── app/
 │   │   ├── api/         # Endpoints y rutas
-│   │   ├── core/        # Configuración y seguridad
+│   │   ├── core/        # Configuración, seguridad y logging
 │   │   ├── models.py    # Modelos de base de datos
 │   │   ├── services/    # Lógica de negocio (AI, juegos)
 │   │   └── schemas/     # Schemas Pydantic
+│   ├── logs/            # Logs de la aplicación (auto-generado)
+│   │   ├── app.log      # Log general
+│   │   └── errors.log   # Solo errores
 │   └── Dockerfile
 ├── frontend/            # App React
 │   ├── src/
@@ -103,6 +106,10 @@ docker-compose logs -f
 
 # Ver logs solo del backend
 docker-compose logs -f backend
+
+# Ver logs de aplicación (dentro del contenedor)
+docker-compose exec backend tail -f logs/app.log
+docker-compose exec backend tail -f logs/errors.log
 
 # Detener contenedores
 docker-compose down
@@ -191,6 +198,30 @@ docker-compose exec backend alembic history
 La IA utiliza el modelo **Polaris Alpha** de OpenRouter con:
 - Análisis de amenazas inmediatas (ganar/bloquear)
 - Estrategia posicional (centro, esquinas, bordes)
+- Ajuste de dificultad según selección del usuario
+- Respuestas instantáneas con validación previa
+
+## 📊 Sistema de Logging
+
+El backend incluye un sistema de logging completo:
+
+- **Logs rotativos**: Archivos de máximo 10MB con 5 backups
+- **Múltiples niveles**: DEBUG, INFO, WARNING, ERROR
+- **Dos archivos de log**:
+  - `logs/app.log`: Registro general de la aplicación
+  - `logs/errors.log`: Solo errores y excepciones
+- **Logging estructurado**:
+  - Autenticación: Intentos de login exitosos y fallidos
+  - Juegos: Creación, movimientos, ganadores
+  - IA: Selección de movimientos, llamadas API, errores
+  - Excepciones: Todas las excepciones con traceback completo
+
+**Ver logs en tiempo real:**
+```bash
+# Dentro del contenedor
+docker-compose exec backend tail -f logs/app.log
+docker-compose exec backend tail -f logs/errors.log
+```
 - Ajuste de dificultad según selección del usuario
 - Respuestas instantáneas con validación previa
 cd frontend
