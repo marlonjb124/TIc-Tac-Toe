@@ -1,11 +1,17 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCreateGame, useMakeMove, useCurrentUser } from "../hooks/useApi";
+import { gameApi } from "../api";
 import Board from "../components/Board";
 import type { Difficulty, MoveResponse } from "../types";
 
 export default function GamePage() {
-  const [gameId, setGameId] = useState<number | null>(null);
+  const [searchParams] = useSearchParams();
+  const existingGameId = searchParams.get("id");
+
+  const [gameId, setGameId] = useState<number | null>(
+    existingGameId ? parseInt(existingGameId) : null
+  );
   const [board, setBoard] = useState<string[]>(Array(9).fill(" "));
   const [gameStatus, setGameStatus] = useState<"in_progress" | "finished" | "draw">("in_progress");
   const [winner, setWinner] = useState<string | null>(null);
@@ -16,6 +22,26 @@ export default function GamePage() {
   const { data: user } = useCurrentUser();
   const createGameMutation = useCreateGame();
   const makeMoveMutation = useMakeMove(gameId || 0);
+
+  // Load existing game if ID is in URL
+  useEffect(() => {
+    const loadGame = async () => {
+      if (existingGameId) {
+        try {
+          const game = await gameApi.getGame(parseInt(existingGameId));
+          setGameId(game.id);
+          setBoard(game.board);
+          setGameStatus(game.status);
+          setWinner(game.winner);
+          setDifficulty(game.difficulty);
+        } catch (error) {
+          console.error("Failed to load game:", error);
+          navigate("/dashboard");
+        }
+      }
+    };
+    loadGame();
+  }, [existingGameId, navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
@@ -126,6 +152,12 @@ export default function GamePage() {
             )}
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="px-5 py-2 bg-white/20 backdrop-blur text-white rounded-xl hover:bg-white/30 transition-all border border-white/30 font-medium"
+            >
+              ← Dashboard
+            </button>
             {gameId && (
               <button
                 onClick={resetToMenu}

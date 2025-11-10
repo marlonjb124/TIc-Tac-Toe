@@ -3,6 +3,12 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface SignupRequest {
+  email: string;
+  password: string;
+  full_name?: string;
+}
+
 export interface Token {
   access_token: string;
   token_type: string;
@@ -14,6 +20,16 @@ export interface User {
   full_name: string | null;
   is_active: boolean;
   created_at: string;
+}
+
+export interface UserStats {
+  total_games: number;
+  games_in_progress: number;
+  games_finished: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  win_rate: number;
 }
 
 export type GameStatus = "in_progress" | "finished" | "draw";

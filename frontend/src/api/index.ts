@@ -1,8 +1,10 @@
 import { apiClient } from "./client";
 import type {
   LoginRequest,
+  SignupRequest,
   Token,
   User,
+  UserStats,
   Game,
   GameCreate,
   MoveCreate,
@@ -15,7 +17,7 @@ export const authApi = {
     formData.append("username", credentials.username);
     formData.append("password", credentials.password);
 
-    const { data } = await apiClient.post<Token>("/login/access-token", formData, {
+    const { data } = await apiClient.post<Token>("/auth/login/access-token", formData, {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
@@ -23,8 +25,18 @@ export const authApi = {
     return data;
   },
 
+  signup: async (userData: SignupRequest): Promise<User> => {
+    const { data } = await apiClient.post<User>("/auth/signup", userData);
+    return data;
+  },
+
   getCurrentUser: async (): Promise<User> => {
     const { data } = await apiClient.get<User>("/users/me");
+    return data;
+  },
+
+  getUserStats: async (): Promise<UserStats> => {
+    const { data } = await apiClient.get<UserStats>("/users/me/stats");
     return data;
   },
 };
@@ -48,8 +60,9 @@ export const gameApi = {
     return data;
   },
 
-  listGames: async (): Promise<Game[]> => {
-    const { data } = await apiClient.get<Game[]>("/games/");
+  listGames: async (status?: string): Promise<Game[]> => {
+    const params = status ? { status } : {};
+    const { data } = await apiClient.get<Game[]>("/games/", { params });
     return data;
   },
 };

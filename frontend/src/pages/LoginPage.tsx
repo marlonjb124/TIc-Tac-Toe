@@ -1,24 +1,32 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useLogin } from "../hooks/useApi";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const navigate = useNavigate();
   const loginMutation = useLogin();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setErrorMessage("");
+
     try {
       await loginMutation.mutateAsync({
         username: email,
         password,
       });
-      navigate("/game");
-    } catch (error) {
-      console.error("Login failed:", error);
+      navigate("/dashboard");
+    } catch (error: any) {
+      const detail = error.response?.data?.detail;
+      if (typeof detail === "string") {
+        setErrorMessage(detail);
+      } else {
+        setErrorMessage("Invalid credentials. Please try again.");
+      }
     }
   };
 
@@ -69,9 +77,9 @@ export default function LoginPage() {
             />
           </div>
 
-          {loginMutation.isError && (
+          {errorMessage && (
             <div className="bg-red-500/20 backdrop-blur border border-red-400/30 text-red-100 p-3 rounded-xl text-sm">
-              Invalid credentials. Please try again.
+              {errorMessage}
             </div>
           )}
 
@@ -85,6 +93,13 @@ export default function LoginPage() {
         </form>
 
         <p className="text-sm text-white/60 text-center mt-6">
+          Don't have an account?{" "}
+          <Link to="/signup" className="text-white font-semibold hover:underline">
+            Sign up here
+          </Link>
+        </p>
+
+        <p className="text-sm text-white/50 text-center mt-3">
           Default: admin@tictactoe.com / changethis123
         </p>
       </div>
