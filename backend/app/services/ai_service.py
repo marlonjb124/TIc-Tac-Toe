@@ -1,5 +1,7 @@
 """AI opponent for Tic-Tac-Toe using OpenRouter API."""
 
+import random
+
 import httpx
 
 from app.core.config import settings
@@ -38,15 +40,55 @@ class AIService:
         player: Player,
         difficulty: Difficulty = Difficulty.MEDIUM,
     ) -> int:
+        """
+        Get AI move based on difficulty level.
+
+        EASY: Random moves, no strategy
+        MEDIUM: 60% chance to apply strategy (block/win)
+        HARD: Always applies full strategy
+        """
         opponent_mark = "X" if player == Player.O else "O"
         player_mark = player.value
         threats = self._analyze_threats(board, opponent_mark, player_mark)
 
+        # EASY mode: Pure random, no strategy
+        if difficulty == Difficulty.EASY:
+            available_positions = [
+                i for i, cell in enumerate(board) if cell == " "
+            ]
+            random_move = random.choice(available_positions)
+            logger.info(f"EASY mode: Random move at {random_move}")
+            return random_move
+
+        # MEDIUM mode: 60% chance to apply strategy
+        if difficulty == Difficulty.MEDIUM:
+            apply_strategy = random.random() < 0.6
+            if not apply_strategy:
+                # 40% of the time, make a random move
+                available_positions = [
+                    i for i, cell in enumerate(board) if cell == " "
+                ]
+                random_move = random.choice(available_positions)
+                logger.info(f"MEDIUM mode: Random move at {random_move}")
+                return random_move
+            # Otherwise, proceed with strategy below
+
+        # HARD mode or MEDIUM with strategy: Check for instant win
         if threats["you_can_win"]:
             winning_pos = threats["your_win_pos"]
             logger.info(f"Instant win at {winning_pos} for {player.value}")
             return winning_pos
 
+        # HARD mode or MEDIUM with strategy: Check for critical block
+        if difficulty == Difficulty.HARD or (
+            difficulty == Difficulty.MEDIUM and apply_strategy
+        ):
+            if threats["opponent_can_win"]:
+                block_pos = threats["opponent_win_pos"]
+                logger.info(f"Blocking opponent at {block_pos}")
+                return block_pos
+
+        # Continue with AI prompt for strategic play
         prompt = self._build_prompt(board, player, difficulty)
         invalid_positions = []
         last_error = None
@@ -127,9 +169,9 @@ class AIService:
         available_str = ", ".join(available)
 
         difficulty_instructions = {
-            Difficulty.EASY: "Play casually. Block obvious wins 50% of the time.",
-            Difficulty.MEDIUM: "ALWAYS block opponent wins. ALWAYS take your wins. Use basic strategy.",
-            Difficulty.HARD: "Play perfectly. NEVER miss blocks or wins. Think 3+ moves ahead.",
+            Difficulty.EASY: "Play randomly without strategy. Make casual moves.",
+            Difficulty.MEDIUM: "Use basic strategy. Block obvious wins and take your wins when seen.",
+            Difficulty.HARD: "Play perfectly. ALWAYS block opponent wins. ALWAYS take your wins. Think 3+ moves ahead.",
         }
 
         instruction = difficulty_instructions.get(
