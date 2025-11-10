@@ -23,25 +23,55 @@ Sign up at [openrouter.ai](https://openrouter.ai/) and create an API key.
 **3. Create `.env` file**
 
 Create a `.env` file in the project root:
+
 ```env
-OPENROUTER_API_KEYS=sk-or-v1-your-key-here
+# Database (use 'mariadb' when in Docker, 'localhost' when local)
+MYSQL_SERVER=localhost
+MYSQL_PORT=33060
+MYSQL_USER=tictactoe_user
+MYSQL_PASSWORD=tictactoe_pass
+MYSQL_DB=tictactoe
+
+# Security
+SECRET_KEY=changethis-in-production
+FIRST_SUPERUSER=admin@tictactoe.com
+FIRST_SUPERUSER_PASSWORD=changethis123
+
+# OpenRouter
+OPENROUTER_API_KEYS=sk-or-v1-xxxxx
+OPENROUTER_MODEL=openrouter/polaris-alpha
+**Note:** If you have multiple API keys, separate them with commas:
+```env
+OPENROUTER_API_KEYS=sk-or-v1-key1,sk-or-v1-key2,sk-or-v1-key3
 ```
 
-**4. Start the backend**
+**4. Create frontend `.env` file**
+
+Create a `.env` file in the `frontend/` directory:
+```bash
+cd frontend
+```
+
+Create `frontend/.env`:
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+**5. Start the backend**
 ```bash
 docker-compose up -d
 ```
 
 Wait about 30 seconds for initialization to complete.
 
-**5. Start the frontend**
+**6. Start the frontend**
 ```bash
 cd frontend
 pnpm install
 pnpm run dev
 ```
 
-**6. Open the app**
+**7. Open the app**
 
 Go to http://localhost:5173
 

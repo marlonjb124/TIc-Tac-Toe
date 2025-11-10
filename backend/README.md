@@ -88,6 +88,11 @@ OPENROUTER_API_KEYS=sk-or-v1-xxxxx
 OPENROUTER_MODEL=openrouter/polaris-alpha
 ```
 
+**Note:** Multiple API keys can be separated by commas for load balancing:
+```env
+OPENROUTER_API_KEYS=sk-or-v1-key1,sk-or-v1-key2,sk-or-v1-key3
+```
+
 ## Database Migrations
 
 ```bash
