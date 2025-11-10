@@ -19,7 +19,7 @@ cd TIc-Tac-Toe
 ```
 
 2. **Configura tu API key de OpenRouter**
-   
+
    Crea/edita el archivo `.env` en la raíz del proyecto:
 ```env
 OPENROUTER_API_KEYS=tu-api-key-aqui

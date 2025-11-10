@@ -5,8 +5,11 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.core.logger import get_logger
 from app.core.security import security
 from app.models import User, UserCreate, UserUpdate
+
+logger = get_logger(__name__)
 
 
 class UserService:
@@ -42,6 +45,8 @@ class UserService:
         session.add(db_user)
         await session.commit()
         await session.refresh(db_user)
+
+        logger.info(f"User created: {db_user.email} (id={db_user.id})")
 
         return db_user
 

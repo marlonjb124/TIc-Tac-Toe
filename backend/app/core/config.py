@@ -48,6 +48,7 @@ class Settings(BaseSettings):
 
     # Environment
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
+    DEBUG: bool = False
     DEBUG: bool = True  # Show detailed errors in development
 
     # CORS

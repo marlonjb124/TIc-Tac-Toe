@@ -7,7 +7,10 @@ import httpx
 
 from app.core.config import settings
 from app.core.exceptions import AIServiceException
+from app.core.logger import get_logger
 from app.models import Difficulty, Player
+
+logger = get_logger(__name__)
 
 
 class AIService:
@@ -69,8 +72,8 @@ class AIService:
 
         if quick_threats["you_can_win"]:
             winning_move = quick_threats["your_win_pos"]
-            print(
-                f"⚡ INSTANT WIN detected at position {winning_move} - taking it without API call"
+            logger.info(
+                f"Instant win detected at position {winning_move} for {player.value}"
             )
             return winning_move
 
@@ -90,16 +93,19 @@ class AIService:
                     prompt += f"\n\nWARNING: Positions {invalid_moves} are INVALID or already taken. You MUST choose from: {', '.join(available)}"
 
                 move = await self._call_api(prompt, board)
-                print(f"AI attempt {attempt + 1}: move={move}")
+                logger.debug(f"AI attempt {attempt + 1}: move={move}")
 
                 # Validate the move
                 if self._is_valid_move(board, move):
+                    logger.info(
+                        f"AI selected valid move: {move} (difficulty: {difficulty.value})"
+                    )
                     return move
                 else:
                     # Track invalid move and try again
                     invalid_moves.append(move)
                     if attempt < self.max_retries - 1:
-                        print(
+                        logger.warning(
                             f"Invalid move {move}, retrying with updated prompt..."
                         )
                         continue
@@ -114,7 +120,7 @@ class AIService:
 
             except httpx.HTTPStatusError as e:
                 last_error = e
-                print(
+                logger.error(
                     f"API call failed (attempt {attempt + 1}): "
                     f"{e.response.status_code} - Rotating to next key..."
                 )
@@ -130,7 +136,7 @@ class AIService:
                 )
             except httpx.HTTPError as e:
                 last_error = e
-                print(f"HTTP error (attempt {attempt + 1}): {str(e)}")
+                logger.error(f"HTTP error (attempt {attempt + 1}): {str(e)}")
                 if attempt < self.max_retries - 1:
                     continue
                 raise AIServiceException(
@@ -305,7 +311,7 @@ Your move:"""
         # Get next API key from rotation
         api_key = self._get_next_api_key()
         key_suffix = api_key[-8:] if len(api_key) > 8 else api_key
-        print(f"Using API key ending in ...{key_suffix}")
+        logger.debug(f"Using API key ending in ...{key_suffix}")
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -325,9 +331,12 @@ Your move:"""
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            print(f"Calling OpenRouter API: {self.base_url}/chat/completions")
-            print(f"Model: {self.model}")
-            print(f"Prompt length: {len(prompt)} characters")
+            logger.debug(
+                f"Calling OpenRouter API: {self.base_url}/chat/completions"
+            )
+            logger.debug(
+                f"Model: {self.model}, Prompt length: {len(prompt)} chars"
+            )
 
             response = await client.post(
                 f"{self.base_url}/chat/completions",
@@ -335,27 +344,24 @@ Your move:"""
                 json=payload,
             )
 
-            print(f"Response status code: {response.status_code}")
-            print(f"Response headers: {dict(response.headers)}")
+            logger.debug(f"Response status: {response.status_code}")
 
             # Log response body before raising errors
             try:
                 response_text = response.text
-                print(
-                    f"Response body: {response_text[:500]}..."
-                )  # First 500 chars
+                logger.debug(f"Response body: {response_text[:500]}...")
             except Exception as e:
-                print(f"Could not read response body: {e}")
+                logger.warning(f"Could not read response body: {e}")
 
             response.raise_for_status()
 
             data = response.json()
-            print(f"Parsed JSON response: {data}")
+            logger.debug(f"Parsed JSON response: {data}")
 
             # Extract move from response
             try:
                 content = data["choices"][0]["message"]["content"].strip()
-                print(
+                logger.debug(
                     f"AI Response: '{content}' (Key #{self.current_key_index})"
                 )
 
@@ -368,9 +374,10 @@ Your move:"""
 
                 move = int(match.group())
                 available = [i for i, c in enumerate(board) if c == " "]
-                print(f"Parsed move: {move}, Available: {available}")
+                logger.debug(f"Parsed move: {move}, Available: {available}")
                 return move
             except (KeyError, ValueError, IndexError) as e:
+                logger.error(f"Failed to parse AI response: {str(e)}")
                 raise AIServiceException(
                     message="Failed to parse AI response",
                     details={

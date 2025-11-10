@@ -13,6 +13,7 @@ from app.core.exceptions import (
     NotFoundException,
 )
 from app.core.game_engine import GameEngine
+from app.core.logger import get_logger
 from app.models import (
     Game,
     GameCreate,
@@ -24,6 +25,8 @@ from app.models import (
     Player,
 )
 from app.services.ai_service import ai_service
+
+logger = get_logger(__name__)
 
 
 class GameService:
@@ -48,6 +51,11 @@ class GameService:
         session.add(game)
         await session.commit()
         await session.refresh(game)
+
+        logger.info(
+            f"New game created: id={game.id}, user_id={user_id}, "
+            f"difficulty={game.difficulty.value}"
+        )
 
         return self._to_public(game)
 
@@ -108,8 +116,9 @@ class GameService:
         game.board = GameEngine.make_move(
             game.board, move_create.position, Player.X
         )
-        print(
-            f"After player move: board='{game.board}', position={move_create.position}"
+        logger.debug(
+            f"Player move: position={move_create.position}, "
+            f"board='{game.board}'"
         )
 
         session.add(
@@ -126,6 +135,7 @@ class GameService:
             game.winner = winner
             await session.commit()
             await session.refresh(game)
+            logger.info(f"Game {game.id} finished - Winner: {winner.value}")
 
             return MovePublic(
                 position=move_create.position,
@@ -139,6 +149,7 @@ class GameService:
             game.status = GameStatus.DRAW
             await session.commit()
             await session.refresh(game)
+            logger.info(f"Game {game.id} ended in draw")
 
             return MovePublic(
                 position=move_create.position,
@@ -151,13 +162,16 @@ class GameService:
         ai_position: Optional[int] = None
 
         # Always use AI opponent
-        print(f"Calling AI with board: '{game.board}'")
+        logger.debug(f"Requesting AI move for game {game.id}")
         ai_position = await ai_service.get_move(
             board=game.board,
             player=Player.O,
             difficulty=game.difficulty,
         )
-        print(f"AI chose position: {ai_position}")
+        logger.info(
+            f"AI move for game {game.id}: position={ai_position}, "
+            f"difficulty={game.difficulty.value}"
+        )
 
         game.board = GameEngine.make_move(game.board, ai_position, Player.O)
 

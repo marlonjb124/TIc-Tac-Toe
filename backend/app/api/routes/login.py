@@ -11,11 +11,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
+from app.core.logger import get_logger
 from app.core.security import security
 from app.models import Token, UserCreate, UserPublic
 from app.services.user_service import user_service
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 @router.post("/signup", response_model=Token)
@@ -74,12 +76,14 @@ async def login_access_token(
     )
 
     if not user:
+        logger.warning(f"Failed login attempt for: {form_data.username}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect email or password",
         )
 
     if not user.is_active:
+        logger.warning(f"Inactive user login attempt: {user.email}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user",
@@ -92,6 +96,8 @@ async def login_access_token(
     access_token = security.create_access_token(
         subject=user.id, expires_delta=access_token_expires
     )
+
+    logger.info(f"Successful login: {user.email} (id={user.id})")
 
     return Token(access_token=access_token)
 

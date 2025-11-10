@@ -12,6 +12,9 @@ from starlette.middleware.cors import CORSMiddleware
 from app.api.main import api_router
 from app.core.config import settings
 from app.core.exceptions import AppException
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -48,6 +51,10 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.exception_handler(AppException)
 async def app_exception_handler(request: Request, exc: AppException):
     """Handle all custom application exceptions."""
+    logger.warning(
+        f"App exception: {exc.error_code} - {exc.message}",
+        extra={"details": exc.details},
+    )
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -63,6 +70,7 @@ async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ):
     """Handle validation errors from Pydantic."""
+    logger.warning(f"Validation error: {exc.errors()}")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
@@ -79,7 +87,8 @@ async def generic_exception_handler(request: Request, exc: Exception):
     import traceback
 
     # Log the full traceback for debugging
-    traceback.print_exc()
+    error_trace = traceback.format_exc()
+    logger.error(f"Unhandled exception: {str(exc)}\n{error_trace}")
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

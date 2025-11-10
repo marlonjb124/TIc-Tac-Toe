@@ -4,11 +4,15 @@ Run this after starting the application for the first time.
 """
 
 import asyncio
+import logging
 
 from app.core.config import settings
 from app.core.db import AsyncSessionLocal
 from app.models import UserCreate
 from app.services.user_service import user_service
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 async def create_superuser() -> None:
@@ -20,8 +24,8 @@ async def create_superuser() -> None:
         )
 
         if existing_user:
-            print("⚠ Superuser already exists!")
-            print(f"   Email: {existing_user.email}")
+            logger.warning("Superuser already exists!")
+            logger.info(f"Email: {existing_user.email}")
             return
 
         # Create superuser
@@ -36,12 +40,12 @@ async def create_superuser() -> None:
             session=session, user_create=superuser_data
         )
 
-        print("✅ Superuser created successfully!")
-        print(f"   Email: {user.email}")
-        print(f"   Password: {settings.FIRST_SUPERUSER_PASSWORD}")
-        print("⚠ Please change the password immediately!")
+        logger.info("✅ Superuser created successfully!")
+        logger.info(f"Email: {user.email}")
+        logger.info(f"Password: {settings.FIRST_SUPERUSER_PASSWORD}")
+        logger.warning("Please change the password immediately!")
 
 
 if __name__ == "__main__":
-    print("🚀 Creating superuser...")
+    logger.info("🚀 Creating superuser...")
     asyncio.run(create_superuser())

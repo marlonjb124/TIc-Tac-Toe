@@ -24,6 +24,11 @@ def upgrade():
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column(
+            "difficulty",
+            sa.Enum("EASY", "MEDIUM", "HARD", name="difficulty"),
+            nullable=False,
+        ),
+        sa.Column(
             "board", sqlmodel.sql.sqltypes.AutoString(length=9), nullable=False
         ),
         sa.Column(
