@@ -74,15 +74,6 @@ async def get_current_active_superuser(
 ) -> User:
     """
     Get current active superuser.
-
-    Args:
-        current_user: Current user
-
-    Returns:
-        Current user if superuser
-
-    Raises:
-        HTTPException: If user is not superuser
     """
     if not current_user.is_superuser:
         raise HTTPException(

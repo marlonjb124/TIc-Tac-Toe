@@ -1,259 +1,199 @@
-# Tic-Tac-Toe Game with AI
+# Tic-Tac-Toe with AI
 
-Un juego de Tic-Tac-Toe (tres en raya) con IA basada en OpenRouter, construido con FastAPI, React y MariaDB.
+Tic-tac-toe game against an AI that uses OpenRouter. FastAPI backend with MariaDB, React frontend.
 
-## 🚀 Inicio Rápido
+## First time setup
 
-### Prerequisitos
-- **Docker y Docker Compose** (para backend y base de datos)
-- **Node.js 18+** (para el frontend)
-- **pnpm** - Instalar con: `npm install -g pnpm`
-- **API key de OpenRouter** - Obtén una gratis en [openrouter.ai](https://openrouter.ai)
+You need to have installed:
+- Docker and Docker Compose
+- Node.js 18 or higher
+- pnpm (install with `npm install -g pnpm`)
 
-### Instalación
+### Steps
 
-1. **Clona el repositorio**
+1. Clone the repo and navigate to the directory:
 ```bash
 git clone https://github.com/marlonjb124/TIc-Tac-Toe.git
 cd TIc-Tac-Toe
 ```
 
-2. **Configura tu API key de OpenRouter**
-
-   Crea/edita el archivo `.env` en la raíz del proyecto:
+2. Create a `.env` file in the root with your OpenRouter API key:
 ```env
-OPENROUTER_API_KEYS=tu-api-key-aqui
+OPENROUTER_API_KEYS=your-keys-here
 ```
 
-3. **Inicia el backend y base de datos con Docker**
+Get one for free at openrouter.ai if you don't have one. Note: free keys have usage limits.
+
+3. Start the backend and database:
 ```bash
-# Inicia MariaDB y el backend (automáticamente ejecuta migraciones y crea el superuser)
 docker-compose up -d
 ```
 
-4. **Inicia el frontend localmente**
+This will:
+- Create the MariaDB database
+- Run migrations automatically
+- Create the admin user (admin@tictactoe.com / changethis123)
+- Start the API on port 8000
+
+4. Install and start the frontend:
 ```bash
 cd frontend
 pnpm install
 pnpm run dev
 ```
 
-¡Listo! La aplicación estará disponible en:
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+The game will be at http://localhost:5173
 
-### Usuario por defecto (creado automáticamente)
-- **Email**: `admin@tictactoe.com`
-- **Password**: `changethis123`
+The API has interactive documentation at http://localhost:8000/api/v1/docs
 
-## 🎮 Características
-
-- ✅ **Tres niveles de dificultad**: Fácil, Medio y Difícil
-- ✅ **IA inteligente**: Potenciada por OpenRouter con análisis de amenazas
-- ✅ **Interfaz moderna**: Diseño glassmorphism con animaciones
-- ✅ **Autenticación JWT**: Sistema seguro de usuarios
-- ✅ **Historial completo**: Revisa todas tus partidas anteriores
-
-## 🛠️ Tecnologías
-
-**Backend:**
-- FastAPI (Python)
-- SQLModel (ORM async)
-- MariaDB 10.11
-- OpenRouter AI (modelo: polaris-alpha)
-- Docker
-
-**Frontend:**
-- React 18 + TypeScript
-- Vite 7
-- Tailwind CSS v4
-- TanStack Query (React Query)
-- Axios
-
-## � Arquitectura del Proyecto
+## Project structure
 
 ```
-.
-├── backend/              # API FastAPI
-│   ├── app/
-│   │   ├── api/         # Endpoints y rutas
-│   │   ├── core/        # Configuración, seguridad y logging
-│   │   ├── models.py    # Modelos de base de datos
-│   │   ├── services/    # Lógica de negocio (AI, juegos)
-│   │   └── schemas/     # Schemas Pydantic
-│   ├── logs/            # Logs de la aplicación (auto-generado)
-│   │   ├── app.log      # Log general
-│   │   └── errors.log   # Solo errores
-│   └── Dockerfile
-├── frontend/            # App React
-│   ├── src/
-│   │   ├── components/  # Componentes reutilizables
-│   │   ├── pages/       # Páginas principales
-│   │   ├── hooks/       # Custom hooks (useApi)
-│   │   └── types/       # TypeScript types
-│   └── package.json
-└── docker-compose.yml   # Orquestación Docker (backend + DB)
+backend/
+  app/
+    api/          REST endpoints
+    core/         Configuration, security, logging
+    services/     Game and AI logic
+    scripts/      Migrate and seed
+    models.py     Database models
+  logs/           Created automatically
+  Dockerfile
+
+frontend/
+  src/
+    components/   React components
+    pages/        Main pages
+    hooks/        Custom hooks
+    types/        TypeScript types
+
+docker-compose.yml  Backend + MariaDB
 ```
 
-## �📝 Comandos útiles
+## Useful commands
 
-### Docker
-
+Check what's running:
 ```bash
-# Ver logs en tiempo real
-docker-compose logs -f
-
-# Ver logs solo del backend
-docker-compose logs -f backend
-
-# Ver logs de aplicación (dentro del contenedor)
-docker-compose exec backend tail -f logs/app.log
-docker-compose exec backend tail -f logs/errors.log
-
-# Detener contenedores
-docker-compose down
-
-# Reiniciar desde cero (⚠️ elimina la base de datos)
-docker-compose down -v
-docker-compose up -d
-# Las migraciones y el superuser se crean automáticamente
-
-# Verificar estado de contenedores
 docker-compose ps
 ```
 
-### Frontend
-
+View backend logs:
 ```bash
-# Instalar dependencias
-cd frontend
-pnpm install
-
-# Modo desarrollo
-pnpm run dev
-
-# Build para producción
-pnpm run build
-
-# Preview del build
-pnpm run preview
+docker-compose logs -f backend
 ```
 
-## 🔧 Desarrollo Avanzado
+View application logs (inside container):
+```bash
+docker-compose exec backend tail -f logs/app.log
+```
 
-### Backend sin Docker
+Restart everything:
+```bash
+docker-compose restart
+```
 
-Si prefieres ejecutar el backend localmente sin Docker:
+Start from scratch (deletes DB):
+```bash
+docker-compose down -v
+docker-compose up -d
+```
+
+## Local backend development
+
+If you prefer to run the backend without Docker:
 
 ```bash
 cd backend
 
-# Crear entorno virtual con uv
-uv venv
-source .venv/bin/activate  # Linux/Mac
-# o
-.venv\Scripts\activate     # Windows
+# Install uv if you don't have it
+irm https://astral.sh/uv/install.ps1 | iex
 
-# Instalar dependencias
-uv pip install -e .
+# Install dependencies
+uv sync
 
-# Configurar .env con tu base de datos local
-# Ejecutar migraciones
-alembic upgrade head
+# Start only MariaDB
+docker-compose up mariadb -d
 
-# Iniciar servidor
-uvicorn app.main:app --reload
+# Run migrations
+uv run alembic upgrade head
+
+# Create superuser
+uv run python app/initial_data.py
+
+# Start server
+uv run fastapi dev app/main.py
 ```
 
-### Migraciones de Base de Datos
+## Technologies
 
+Backend:
+- FastAPI for the API
+- SQLModel as ORM
+- MariaDB for data
+- OpenRouter (polaris-alpha model) for AI
+- SlowAPI for rate limiting
+
+Frontend:
+- React 18 with TypeScript
+- Vite as bundler
+- Tailwind CSS v4
+- TanStack Query for state management
+- Axios for requests
+
+## How the AI works
+
+The AI analyzes the board before each move:
+1. Check if it can win this turn
+2. If not, block if player can win
+3. If not, choose center or corners based on strategy
+4. Adjust intelligence based on chosen difficulty
+
+Levels:
+- Easy: Random play, blocks obvious wins 50% of the time
+- Medium: Always blocks and takes wins, basic strategy
+- Hard: Perfect play, thinks several moves ahead
+
+## Logging system
+
+The backend saves logs to two files:
+- `logs/app.log`: Everything (info, debug, warnings, errors)
+- `logs/errors.log`: Only errors
+
+Files rotate automatically when they reach 10MB, 5 versions are kept.
+
+Logged events:
+- Successful and failed logins
+- Game creation
+- Player and AI moves
+- OpenRouter API calls
+- Errors with complete stack traces
+
+## Common issues
+
+Frontend won't connect:
+- Verify backend is running with `docker-compose ps`
+- Check logs with `docker-compose logs backend`
+
+Can't login:
+- Admin user is created automatically when starting Docker
+- Wait a few seconds for it to finish initializing
+- User: admin@tictactoe.com
+- Password: changethis123
+
+AI doesn't respond:
+- Check that OpenRouter API key is correct in .env
+- Look at logs: `docker-compose logs -f backend`
+- Verify you have credits in your OpenRouter account
+
+Migration errors:
 ```bash
-# Crear nueva migración
-docker-compose exec backend alembic revision --autogenerate -m "descripcion"
-
-# Aplicar migraciones
-docker-compose exec backend alembic upgrade head
-
-# Revertir última migración
-docker-compose exec backend alembic downgrade -1
-
-# Ver historial
-docker-compose exec backend alembic history
-```
-
-## 🎯 Cómo Jugar
-
-1. **Regístrate o inicia sesión** con el usuario por defecto
-2. **Haz clic en "Nuevo Juego"**
-3. **Selecciona la dificultad**:
-   - 🟢 **Fácil**: La IA juega de forma aleatoria
-   - 🟡 **Medio**: La IA bloquea tus jugadas ganadoras
-   - 🔴 **Difícil**: La IA juega estratégicamente para ganar
-4. **¡Juega!** - Tú eres las X, la IA son las O
-5. **Revisa el historial** de todas tus partidas
-
-## 🤖 Sobre la IA
-
-La IA utiliza el modelo **Polaris Alpha** de OpenRouter con:
-- Análisis de amenazas inmediatas (ganar/bloquear)
-- Estrategia posicional (centro, esquinas, bordes)
-- Ajuste de dificultad según selección del usuario
-- Respuestas instantáneas con validación previa
-
-## 📊 Sistema de Logging
-
-El backend incluye un sistema de logging completo:
-
-- **Logs rotativos**: Archivos de máximo 10MB con 5 backups
-- **Múltiples niveles**: DEBUG, INFO, WARNING, ERROR
-- **Dos archivos de log**:
-  - `logs/app.log`: Registro general de la aplicación
-  - `logs/errors.log`: Solo errores y excepciones
-- **Logging estructurado**:
-  - Autenticación: Intentos de login exitosos y fallidos
-  - Juegos: Creación, movimientos, ganadores
-  - IA: Selección de movimientos, llamadas API, errores
-  - Excepciones: Todas las excepciones con traceback completo
-
-**Ver logs en tiempo real:**
-```bash
-# Dentro del contenedor
-docker-compose exec backend tail -f logs/app.log
-docker-compose exec backend tail -f logs/errors.log
-```
-- Ajuste de dificultad según selección del usuario
-- Respuestas instantáneas con validación previa
-cd frontend
-## 🐛 Troubleshooting
-
-### El frontend no se conecta al backend
-- Verifica que el backend esté corriendo: `docker-compose ps`
-- Revisa que el puerto 8000 esté disponible
-- Asegúrate de que `.env` tenga tu API key de OpenRouter
-
-### Error en migraciones de base de datos
-```bash
-# Reiniciar base de datos limpia (migraciones se ejecutan automáticamente)
 docker-compose down -v
 docker-compose up -d
 ```
 
-### No puedo iniciar sesión
-- El superuser se crea automáticamente al iniciar Docker
-- Espera unos segundos a que el backend termine de inicializar
-- Verifica los logs: `docker-compose logs backend`
-- Credenciales: `admin@tictactoe.com` / `changethis123`
-
-### La IA no responde
-- Verifica que tu API key de OpenRouter sea válida
-- Revisa los logs: `docker-compose logs -f backend`
-- El modelo usado es `openrouter/polaris-alpha`
-
-## 📄 Licencia
+## License
 
 MIT
 
-## 👨‍💻 Autor
+## Author
 
-Marlon Jiménez - [@marlonjb124](https://github.com/marlonjb124)
+Marlon Jiménez - github.com/marlonjb124

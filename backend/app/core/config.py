@@ -95,6 +95,13 @@ class Settings(BaseSettings):
     AI_MAX_RETRIES: int = 3
     AI_TIMEOUT_SECONDS: int = 30
 
+    # Rate Limiting
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_DEFAULT: str = "100/minute"
+    RATE_LIMIT_LOGIN: str = "5/minute"
+    RATE_LIMIT_SIGNUP: str = "3/minute"
+    RATE_LIMIT_AI_MOVE: str = "30/minute"
+
     @computed_field  # type: ignore
     @property
     def api_keys_list(self) -> list[str]:

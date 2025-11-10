@@ -6,6 +6,9 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api.main import api_router
@@ -15,12 +18,22 @@ from app.core.logger import app_logger, get_logger
 
 logger = get_logger(__name__)
 
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=(
+        [settings.RATE_LIMIT_DEFAULT] if settings.RATE_LIMIT_ENABLED else []
+    ),
+    enabled=settings.RATE_LIMIT_ENABLED,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app_logger.get_logger()
     logger.info(f"{settings.PROJECT_NAME} started - {settings.ENVIRONMENT}")
     logger.info(f"Debug mode: {settings.DEBUG}")
+    if settings.RATE_LIMIT_ENABLED:
+        logger.info(f"Rate limiting: {settings.RATE_LIMIT_DEFAULT}")
     yield
     logger.info("Shutting down...")
 
@@ -40,6 +53,9 @@ app = FastAPI(
     generate_unique_id_function=custom_generate_unique_id,
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 if settings.all_cors_origins:
     app.add_middleware(

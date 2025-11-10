@@ -2,13 +2,17 @@
 
 from typing import Any
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.api.deps import CurrentUser, SessionDep
+from app.core.config import settings
 from app.models import GameCreate, GamePublic, MoveCreate, MovePublic
 from app.services.game_service import game_service
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post(
@@ -79,7 +83,9 @@ async def get_game(
     Returns the updated board state after both moves.
     """,
 )
+@limiter.limit(settings.RATE_LIMIT_AI_MOVE)
 async def make_move(
+    request: Request,
     session: SessionDep,
     current_user: CurrentUser,
     game_id: int,

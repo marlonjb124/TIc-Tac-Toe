@@ -25,20 +25,6 @@ async def list_users(
 ) -> UsersPublic:
     """
     List all users (superuser only).
-
-    Retrieve a paginated list of users. Only accessible to superusers.
-
-    Args:
-        session: Database session
-        current_user: Current authenticated superuser
-        skip: Number of records to skip (offset)
-        limit: Maximum number of records to return
-
-    Returns:
-        Paginated list of users with total count
-
-    Raises:
-        HTTPException: 403 if user is not a superuser
     """
     # Get users with pagination
     statement = select(User).offset(skip).limit(limit)

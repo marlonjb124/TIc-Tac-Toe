@@ -8,7 +8,8 @@ import logging
 
 from app.core.config import settings
 from app.core.db import AsyncSessionLocal
-from app.models import UserCreate
+from app.core.security import security
+from app.models import User
 from app.services.user_service import user_service
 
 logging.basicConfig(level=logging.INFO)
@@ -16,31 +17,36 @@ logger = logging.getLogger(__name__)
 
 
 async def init_db() -> None:
-    """Initialize database with initial data."""
     async with AsyncSessionLocal() as session:
-        # Check if superuser exists
         user = await user_service.get_by_email(
             session=session, email=settings.FIRST_SUPERUSER
         )
 
         if not user:
             logger.info("Creating first superuser")
-            user_in = UserCreate(
-                email=settings.FIRST_SUPERUSER,
-                password=settings.FIRST_SUPERUSER_PASSWORD,
-                is_superuser=True,
-                full_name="Admin User",
-            )
-            user = await user_service.create(
-                session=session, user_create=user_in
-            )
-            logger.info(f"Superuser created: {user.email}")
-        else:
-            logger.info("Superuser already exists")
+
+        password = settings.FIRST_SUPERUSER_PASSWORD
+        hashed_pw = security.get_password_hash(password)
+        superuser = User(
+            email=settings.FIRST_SUPERUSER,
+            full_name="Admin User",
+            hashed_password=hashed_pw,
+            is_superuser=True,
+            is_active=True,
+        )
+
+        session.add(superuser)
+        await session.commit()
+        await session.refresh(superuser)
+
+        logger.info(
+            f"Superuser created: {superuser.email} (id={superuser.id})"
+        )
+
+        return superuser
 
 
 async def main() -> None:
-    """Main function."""
     logger.info("Creating initial data")
     await init_db()
     logger.info("Initial data created")

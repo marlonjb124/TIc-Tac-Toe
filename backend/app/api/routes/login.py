@@ -3,8 +3,10 @@
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
@@ -15,10 +17,14 @@ from app.services.user_service import user_service
 
 router = APIRouter()
 logger = get_logger(__name__)
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/signup", response_model=Token)
-async def signup(session: SessionDep, user: UserCreate) -> Token:
+@limiter.limit(settings.RATE_LIMIT_SIGNUP)
+async def signup(
+    request: Request, session: SessionDep, user: UserCreate
+) -> Token:
     existing = await user_service.get_by_email(
         session=session, email=user.email
     )
@@ -39,7 +45,9 @@ async def signup(session: SessionDep, user: UserCreate) -> Token:
 
 
 @router.post("/login/access-token", response_model=Token)
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login_access_token(
+    request: Request,
     session: SessionDep,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:

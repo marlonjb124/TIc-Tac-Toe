@@ -32,7 +32,12 @@ class UserService:
     ) -> User:
         hashed_pw = security.get_password_hash(user_create.password)
         user_data = user_create.model_dump(exclude={"password"})
-        new_user = User(**user_data, hashed_password=hashed_pw)
+        new_user = User(
+            **user_data,
+            hashed_password=hashed_pw,
+            is_superuser=False,
+            is_active=True,
+        )
 
         session.add(new_user)
         await session.commit()
