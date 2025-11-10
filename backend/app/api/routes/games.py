@@ -1,6 +1,6 @@
 """Game endpoints for Tic-Tac-Toe API."""
 
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Request, status
 from slowapi import Limiter
@@ -103,16 +103,38 @@ async def make_move(
     "/",
     response_model=list[GamePublic],
     summary="List user's games",
+    description="""
+    Get list of user's games with optional filtering.
+
+    **Filter by status:**
+    - `in_progress`: Only active games
+    - `finished`: Only completed games (won/lost)
+    - `draw`: Only tied games
+    - No filter: All games
+
+    Results are ordered by most recently updated first.
+    """,
 )
 async def list_games(
     session: SessionDep,
     current_user: CurrentUser,
     skip: int = 0,
     limit: int = 100,
+    status: Optional[str] = None,
 ) -> Any:
+    from app.models import GameStatus
+
+    game_status = None
+    if status:
+        try:
+            game_status = GameStatus(status)
+        except ValueError:
+            pass
+
     return await game_service.list_games(
         session=session,
         user_id=current_user.id,
         skip=skip,
         limit=limit,
+        status=game_status,
     )

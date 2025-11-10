@@ -48,7 +48,8 @@ class GameService:
         await session.refresh(game)
 
         logger.info(
-            f"New game: id={game.id}, user={user_id}, difficulty={game.difficulty.value}"
+            f"New game: id={game.id}, user={user_id}, "
+            f"difficulty={game.difficulty.value}"
         )
 
         return self._to_public(game)
@@ -190,11 +191,15 @@ class GameService:
         user_id: int,
         skip: int = 0,
         limit: int = 100,
+        status: Optional[GameStatus] = None,
     ) -> list[GamePublic]:
+        statement = select(Game).where(Game.user_id == user_id)
+
+        if status:
+            statement = statement.where(Game.status == status)
+
         statement = (
-            select(Game)
-            .where(Game.user_id == user_id)
-            .order_by(Game.created_at.desc())
+            statement.order_by(Game.updated_at.desc())
             .offset(skip)
             .limit(limit)
         )
@@ -202,6 +207,45 @@ class GameService:
         games = result.all()
 
         return [self._to_public(game) for game in games]
+
+    async def get_user_stats(
+        self, session: AsyncSession, user_id: int
+    ) -> dict:
+        """Calculate user game statistics."""
+        from app.models import UserStats
+
+        all_games_stmt = select(Game).where(Game.user_id == user_id)
+        result = await session.exec(all_games_stmt)
+        all_games = result.all()
+
+        total_games = len(all_games)
+        games_in_progress = sum(
+            1 for g in all_games if g.status == GameStatus.IN_PROGRESS
+        )
+        games_finished = sum(
+            1 for g in all_games if g.status == GameStatus.FINISHED
+        )
+        draws = sum(1 for g in all_games if g.status == GameStatus.DRAW)
+
+        # Player is X, so wins = games where winner is X
+        wins = sum(
+            1
+            for g in all_games
+            if g.status == GameStatus.FINISHED and g.winner == Player.X
+        )
+        losses = games_finished - wins
+
+        win_rate = (wins / games_finished * 100) if games_finished > 0 else 0.0
+
+        return UserStats(
+            total_games=total_games,
+            games_in_progress=games_in_progress,
+            games_finished=games_finished,
+            wins=wins,
+            losses=losses,
+            draws=draws,
+            win_rate=round(win_rate, 2),
+        )
 
     def _to_public(self, game: Game) -> GamePublic:
         game_dict = game.model_dump()

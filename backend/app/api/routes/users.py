@@ -10,7 +10,15 @@ from sqlalchemy import func
 from sqlmodel import select
 
 from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
-from app.models import User, UserCreate, UserPublic, UsersPublic, UserUpdate
+from app.models import (
+    User,
+    UserCreate,
+    UserPublic,
+    UsersPublic,
+    UserStats,
+    UserUpdate,
+)
+from app.services.game_service import game_service
 from app.services.user_service import user_service
 
 router = APIRouter()
@@ -168,3 +176,30 @@ async def read_user_by_id(
         )
 
     return user
+
+
+@router.get("/me/stats", response_model=UserStats)
+async def get_current_user_stats(
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> UserStats:
+    """
+    Get current user's game statistics.
+
+    Returns comprehensive statistics about the user's game history:
+    - Total games played
+    - Games in progress
+    - Finished games (won/lost)
+    - Wins, losses, and draws count
+    - Win rate percentage
+
+    Args:
+        session: Database session
+        current_user: Current authenticated user
+
+    Returns:
+        User game statistics
+    """
+    return await game_service.get_user_stats(
+        session=session, user_id=current_user.id
+    )

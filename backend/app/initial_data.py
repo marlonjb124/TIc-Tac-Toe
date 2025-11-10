@@ -22,8 +22,11 @@ async def init_db() -> None:
             session=session, email=settings.FIRST_SUPERUSER
         )
 
-        if not user:
-            logger.info("Creating first superuser")
+        if user:
+            logger.info("Superuser already exists, skipping creation")
+            return user
+
+        logger.info("Creating first superuser")
 
         password = settings.FIRST_SUPERUSER_PASSWORD
         hashed_pw = security.get_password_hash(password)

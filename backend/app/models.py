@@ -180,3 +180,15 @@ class Move(SQLModel, table=True):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+
+
+# User Statistics Models
+class UserStats(SQLModel):
+
+    total_games: int = 0
+    games_in_progress: int = 0
+    games_finished: int = 0
+    wins: int = 0
+    losses: int = 0
+    draws: int = 0
+    win_rate: float = 0.0  # Percentage of wins from finished games

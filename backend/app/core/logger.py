@@ -21,8 +21,8 @@ class AppLogger:
             self._setup_logger()
 
     def _setup_logger(self) -> None:
-        log_dir = Path("logs")
-        log_dir.mkdir(exist_ok=True)
+        log_dir = Path("/app/logs")
+        log_dir.mkdir(exist_ok=True, parents=True)
 
         self._logger = logging.getLogger("tictactoe")
         self._logger.setLevel(
@@ -76,4 +76,7 @@ logger = app_logger.get_logger()
 
 
 def get_logger(name: str = "tictactoe") -> logging.Logger:
-    return logging.getLogger(name)
+    if name == "tictactoe":
+        return app_logger.get_logger()
+    child_logger = app_logger.get_logger().getChild(name)
+    return child_logger
