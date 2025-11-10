@@ -1,209 +1,153 @@
 # Backend API - Tic-Tac-Toe
 
-REST API built with FastAPI for the game.
+FastAPI REST API with JWT authentication and AI integration.
 
-## Quick start with Docker
+## Quick Start
 
 ```bash
-# Start services
+# From project root
 docker-compose up -d
-
-# Check status
-docker-compose ps
 ```
 
-API will be at http://localhost:8000
+API: http://localhost:8000
+Docs: http://localhost:8000/api/v1/docs
 
-Interactive documentation: http://localhost:8000/docs
+Default admin: admin@tictactoe.com / changethis123
 
-Default user:
-- Email: admin@tictactoe.com
-- Password: changethis123
-
-The admin user is created automatically when you start Docker.
-
-## Local development
-
-If you prefer to run without Docker:
+## Local Development
 
 ```bash
 cd backend
-
-# Install uv
-irm https://astral.sh/uv/install.ps1 | iex
-
-# Install dependencies
+irm https://astral.sh/uv/install.ps1 | iex  # Install uv
 uv sync
-
-# Start only MariaDB
 docker-compose up mariadb -d
-
-# Run migrations
 uv run alembic upgrade head
-
-# Create superuser
 uv run python app/initial_data.py
-
-# Start development server
 uv run fastapi dev app/main.py
 ```
 
-## Endpoints
+## API Endpoints
 
-Authentication:
-- POST /api/v1/signup - Register new user
-- POST /api/v1/login/access-token - Login (returns JWT)
-- POST /api/v1/login/test-token - Validate token
+### Authentication
+- `POST /api/v1/auth/signup` - Register user
+- `POST /api/v1/auth/login/access-token` - Login
+- `POST /api/v1/auth/login/test-token` - Validate token
 
-Users:
-- GET /api/v1/users/ - List all (admin only)
-- POST /api/v1/users/ - Create user (admin only)
-- GET /api/v1/users/me - Current user
-- PATCH /api/v1/users/me - Update profile
-- GET /api/v1/users/{id} - Get specific user
+### Users
+- `GET /api/v1/users/me` - Get current user
+- `GET /api/v1/users/me/stats` - Get game stats
+- `PATCH /api/v1/users/me` - Update profile
 
-Games:
-- POST /api/v1/games/ - Create new game
-- GET /api/v1/games/ - List my games
-- GET /api/v1/games/{id} - View specific game
-- POST /api/v1/games/{id}/move - Make a move
+### Games
+- `POST /api/v1/games/` - Create game
+- `GET /api/v1/games/` - List games (query: `?status=in_progress`)
+- `GET /api/v1/games/{id}` - Get game
+- `POST /api/v1/games/{id}/move` - Make move
 
-Health:
-- GET /health - Service status
+Interactive docs: http://localhost:8000/api/v1/docs
 
-## Structure
+## Project Structure
 
 ```
-app/
-  api/
-    routes/
-      login.py      Authentication
-      users.py      User management
-      games.py      Game logic
-  core/
-    config.py       Environment variables
-    db.py           Database connection
-    security.py     JWT and passwords
-    logger.py       Logging system
-    game_engine.py  Game rules
-  services/
-    user_service.py     User logic
-    game_service.py     Game logic
-    ai_service.py       AI with OpenRouter
-  models.py         Database models
-  initial_data.py   Script to create admin
+backend/
+├── app/
+│   ├── api/
+│   │   ├── routes/       # login.py, users.py, games.py
+│   │   └── deps.py       # Auth dependencies
+│   ├── core/
+│   │   ├── config.py     # Settings
+│   │   ├── db.py         # Database
+│   │   ├── security.py   # JWT & passwords
+│   │   └── logger.py     # Logging
+│   ├── services/         # Business logic
+│   ├── models.py         # Database models
+│   └── main.py           # FastAPI app
+├── logs/                 # Auto-created
+└── alembic/              # Migrations
 ```
 
 ## Configuration
 
-Create a `.env` file in the project root:
+Edit `.env` file in project root:
 
 ```env
-ENVIRONMENT=local
-PROJECT_NAME=Tic-Tac-Toe API
-SECRET_KEY=your-secret-key-change-in-production
-ACCESS_TOKEN_EXPIRE_MINUTES=11520
-
+# Database (use 'mariadb' when in Docker, 'localhost' when local)
 MYSQL_SERVER=localhost
 MYSQL_PORT=33060
 MYSQL_USER=tictactoe_user
 MYSQL_PASSWORD=tictactoe_pass
 MYSQL_DB=tictactoe
 
+# Security
+SECRET_KEY=changethis-in-production
 FIRST_SUPERUSER=admin@tictactoe.com
 FIRST_SUPERUSER_PASSWORD=changethis123
 
-OPENROUTER_API_KEYS=your-api-keys-here
+# OpenRouter
+OPENROUTER_API_KEYS=sk-or-v1-xxxxx
 OPENROUTER_MODEL=openrouter/polaris-alpha
-
-RATE_LIMIT_ENABLED=true
-RATE_LIMIT_LOGIN=5/minute
-RATE_LIMIT_SIGNUP=3/minute
 ```
 
-## Migrations
+## Database Migrations
 
-Create new migration:
 ```bash
+# Create migration
 docker-compose exec backend alembic revision --autogenerate -m "description"
-```
 
-Apply migrations:
-```bash
+# Apply migrations
 docker-compose exec backend alembic upgrade head
-```
 
-View history:
-```bash
+# View history
 docker-compose exec backend alembic history
-```
 
-Revert:
-```bash
+# Rollback
 docker-compose exec backend alembic downgrade -1
 ```
 
-## Logs
+## Logging
 
-The system saves logs to two files inside the `logs/` directory:
+Logs in `backend/logs/`:
+- `app.log` - All events
+- `errors.log` - Errors only
 
-- app.log: All events (INFO, DEBUG, WARNING, ERROR)
-- errors.log: Only errors
-
-Files rotate when they reach 10MB, 5 versions are kept.
-
-View logs in real time:
 ```bash
-docker-compose exec backend tail -f logs/app.log
-docker-compose exec backend tail -f logs/errors.log
+# View logs
+docker-compose exec backend tail -f /app/logs/app.log
+docker-compose exec backend tail -f /app/logs/errors.log
 ```
 
-Logged events:
-- Successful and failed login attempts
-- Game creation and updates
-- Player moves and AI responses
-- OpenRouter API calls
-- Errors with stack traces
-
-## Rate Limiting
-
-The API includes request limiting:
-
-- Login: 5 attempts per minute
-- Signup: 3 attempts per minute
-- AI moves: 30 per minute
-- General: 100 requests per minute
-
-If you hit the limit you'll receive a 429 error.
+Files rotate at 10MB, 5 backups kept.
 
 ## Security
 
-- Passwords hashed with bcrypt
-- JWT tokens with expiration
-- CORS configured
-- Rate limiting enabled
-- SQL injection prevented by SQLModel
+- Password hashing with bcrypt
+- JWT authentication
+- Rate limiting (login: 5/min, signup: 3/min)
+- CORS enabled for frontend
 - Input validation with Pydantic
 
-## Common issues
+## Troubleshooting
 
-Error "relation user does not exist":
+**Database errors:**
 ```bash
-docker-compose exec backend alembic upgrade head !!scripted via .sh using docker-compose!!
+docker-compose exec backend alembic upgrade head
 docker-compose exec backend python app/initial_data.py
 ```
 
-See what's happening:
+**Can't connect to MariaDB:**
 ```bash
-docker-compose logs -f backend
+docker-compose ps mariadb
+docker-compose logs mariadb
+docker-compose restart mariadb
 ```
 
-Restart services:
+**Backend keeps restarting:**
 ```bash
-docker-compose restart
+docker-compose logs backend
+docker-compose up -d --build backend
 ```
 
-Start from scratch (deletes everything):
+**Fresh start:**
 ```bash
 docker-compose down -v
 docker-compose up -d
