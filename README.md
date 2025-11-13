@@ -179,10 +179,8 @@ docker-compose exec backend python app/initial_data.py
 
 Interactive docs: http://localhost:8000/api/v1/docs
 
-## License
 
-MIT
 
 ## Author
 
-Marlon Jiménez - [github.com/marlonjb124](https://github.com/marlonjb124)
+Marlon Marrero  - [github.com/marlonjb124](https://github.com/marlonjb124)
